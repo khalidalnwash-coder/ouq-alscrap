@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سوق السكراب</title>
+<style>
+  :root{
+    --blue:#164E8C;
+    --blue-light:#EAF1FA;
+    --bg:#F5F6F8;
+    --card:#FFFFFF;
+    --border:#E3E5E9;
+    --text:#1C1F26;
+    --text-secondary:#6B7280;
+    --text-muted:#9CA3AF;
+    --danger:#D64545;
+    --danger-bg:#FBEAEA;
+    --success:#1E8E5A;
+    --success-bg:#EAF7F0;
+    --warning:#B98900;
+    --warning-bg:#FBF3DC;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Tahoma','Segoe UI',sans-serif;
+    display:flex; justify-content:center;
+  }
+  #app{
+    width:100%; max-width:420px; min-height:100vh;
+    background:var(--bg); position:relative; padding-bottom:70px;
+  }
+  .screen{ display:none; padding:16px; animation:fadeIn .2s ease; }
+  .screen.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:12px; }
+  .topbar{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .topbar .back{ font-size:20px; color:var(--text-secondary); cursor:pointer; }
+  .topbar h2{ font-size:16px; margin:0; font-weight:600; }
+
+  h1,h2,h3,p{ margin:0; }
+  label{ font-size:12px; color:var(--text-secondary); display:block; margin-bottom:5px; }
+  input, select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:14px; background:#fff; color:var(--text); margin-bottom:12px; font-family:inherit;
+  }
+  textarea{ resize:vertical; min-height:80px; }
+  .row2{ display:flex; gap:8px; }
+  .row2>div{ flex:1; }
+
+  button{ font-family:inherit; cursor:pointer; border:none; border-radius:8px; }
+  .btn-primary{
+    width:100%; background:var(--blue); color:#fff; padding:12px; font-size:14px; font-weight:600;
+  }
+  .btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn-outline{
+    width:100%; background:transparent; border:1px solid #C9CDD3; color:var(--text); padding:11px; font-size:14px;
+  }
+  .btn-ghost{ background:transparent; color:var(--blue); font-size:13px; padding:6px; }
+  .btn-danger{ background:var(--danger); color:#fff; }
+
+  .link{ color:var(--blue); cursor:pointer; }
+  .muted{ color:var(--text-muted); font-size:12px; }
+  .center{ text-align:center; }
+
+  .logo-icon{
+    width:64px; height:64px; border-radius:16px; background:var(--blue);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:28px;
+  }
+
+  .toggle-group{ display:flex; gap:8px; margin-bottom:12px; }
+  .toggle-opt{
+    flex:1; text-align:center; padding:9px; border-radius:8px; border:2px solid var(--border);
+    font-size:12px; cursor:pointer; background:#fff;
+  }
+  .toggle-opt.selected{ border-color:var(--blue); background:var(--blue-light); color:var(--blue); font-weight:600; }
+
+  .pledge-box, .info-box{
+    background:var(--blue-light); border-radius:var(--radius); padding:12px; display:flex; gap:8px; align-items:flex-start; margin-bottom:14px;
+  }
+  .pledge-box p{ font-size:11.5px; line-height:1.8; color:#2b425e; }
+  .pledge-box input{ width:auto; margin:2px 0 0; }
+
+  .otp-row{ display:flex; gap:8px; justify-content:center; margin-bottom:14px; }
+  .otp-row input{ width:44px; height:48px; text-align:center; font-size:18px; margin-bottom:0; padding:0; }
+
+  .cat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .cat-card{
+    border-radius:12px; padding:16px 10px; text-align:center; cursor:pointer; font-size:12.5px; font-weight:600;
+  }
+  .cat-blue{ background:#E7EEFB; color:#1656A8; }
+  .cat-teal{ background:#E3F5F1; color:#0F7A66; }
+  .cat-amber{ background:#FCF1DD; color:#9A6A00; }
+  .cat-coral{ background:#FCE9E6; color:#C1503A; }
+  .cat-card .emoji{ font-size:24px; display:block; margin-bottom:6px; }
+
+  .cat-strip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:14px; }
+  .cat-chip{
+    flex:0 0 auto; padding:8px 14px; border-radius:20px; background:#fff; border:1px solid var(--border);
+    font-size:12px; cursor:pointer; white-space:nowrap;
+  }
+  .cat-chip.selected{ border-color:var(--blue); color:var(--blue); background:var(--blue-light); font-weight:600; }
+
+  .searchbar{ position:relative; margin-bottom:14px; }
+  .searchbar input{ margin:0; padding-right:36px; }
+  .searchbar .icon{ position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); }
+
+  .listing-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .listing-card{ background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; cursor:pointer; }
+  .listing-thumb{ height:80px; background:#EDEFF2; display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .listing-info{ padding:8px; }
+  .listing-info .title{ font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .listing-info .price{ font-size:12px; color:var(--blue); margin-top:2px; }
+  .listing-info .loc{ font-size:10.5px; color:var(--text-muted); margin-top:2px; }
+
+  .badge{ font-size:10px; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; }
+  .badge-success{ background:var(--success-bg); color:var(--success); }
+  .badge-danger{ background:var(--danger-bg); color:var(--danger); }
+  .badge-warning{ background:var(--warning-bg); color:var(--warning); }
+
+  .navbar{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:420px;
+    background:#fff; border-top:1px solid var(--border); display:flex; justify-content:space-around;
+    align-items:center; padding:10px 0; z-index:50;
+  }
+  .navbar .nav-item{ font-size:20px; color:var(--text-muted); cursor:pointer; text-align:center; }
+  .navbar .nav-item.active{ color:var(--blue); }
+  .navbar .nav-item span{ display:block; font-size:9px; margin-top:2px; }
+  .fab{
+    background:var(--blue); color:#fff; width:44px; height:44px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; margin-top:-24px; border:3px solid #fff; font-size:20px;
+  }
+
+  .avatar{
+    width:38px; height:38px; border-radius:50%; background:var(--blue-light); color:var(--blue);
+    display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;
+  }
+  .settings-row{ display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+  .settings-row .icon{ font-size:16px; width:20px; text-align:center; }
+  .settings-row span{ flex:1; font-size:13px; }
+  .settings-row .chev{ color:var(--text-muted); font-size:13px; }
+
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#1C1F26; color:#fff;
+    padding:10px 20px; border-radius:20px; font-size:13px; z-index:100; opacity:0; transition:opacity .3s;
+    pointer-events:none; white-space:nowrap;
+  }
+  .toast.show{ opacity:1; }
+  .reason-item{ display:flex; align-items:center; gap:8px; padding:11px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; }
+  .reason-item.selected{ border-color:var(--danger); background:var(--danger-bg); }
+  .reason-item input{ width:auto; margin:0; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= LANDING ================= -->
+  <div class="screen active" id="screen-landing">
+    <div style="padding-top:60px;">
+      <div class="card center" style="padding:40px 24px;">
+        <div class="logo-icon">🚗</div>
+        <h1 style="font-size:20px; margin-bottom:4px;">سوق السكراب</h1>
+        <p class="muted" style="margin-bottom:26px;">قطع غيار وسيارات تالفة - دول الخليج</p>
+        <button class="btn-primary" style="margin-bottom:10px;" onclick="go('signup')">إنشاء حساب جديد</button>
+        <button class="btn-outline" style="margin-bottom:18px;" onclick="go('login')">تسجيل الدخول</button>
+        <div class="muted link" onclick="go('home')">تصفّح بدون تسجيل</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SIGNUP ================= -->
+  <div class="screen" id="screen-signup">
+    <div class="topbar"><span class="back" onclick="go('landing')">→</span><h2>إنشاء حساب جديد</h2></div>
+    <div class="card">
+      <label>الاسم الكامل</label>
+      <input id="su-name" placeholder="اسمك الثلاثي أو اسم المحل">
+
+      <label>نوع الحساب</label>
+      <div class="toggle-group">
+        <div class="toggle-opt selected" id="type-trader" onclick="selectType('trader')">تشليح / تاجر</div>
+        <div class="toggle-opt" id="type-buyer" onclick="selectType('buyer')">فرد / مشتري</div>
+      </div>
+
+      <label>رقم الجوال</label>
+      <div class="row2">
+        <div style="flex:0 0 100px;">
+          <select id="su-code">
+            <option>966+</option><option>971+</option><option>965+</option>
+            <option>974+</option><option>973+</option><option>968+</option>
+          </select>
+        </div>
+        <div><input id="su-phone" placeholder="5XXXXXXXX"></div>
+      </div>
+
+      <label>البريد الإلكتروني</label>
+      <input id="su-email" type="email" placeholder="example@email.com">
+
+      <div class="row2">
+        <div><label>العمر</label><input id="su-age" type="number" placeholder="30"></div>
+        <div>
+          <label>الدولة</label>
+          <select id="su-country">
+            <option>السعودية</option><option>الإمارات</option><option>الكويت</option>
+            <option>قطر</option><option>البحرين</option><option>عمان</option>
+          </select>
+        </div>
+      </div>
+
+      <label>كلمة المرور</label>
+      <input id="su-pass" type="password" placeholder="8 أحرف على الأقل">
+
+      <div class="pledge-box">
+        <input type="checkbox" id="su-pledge" onchange="checkSignupValid()">
+        <p>أتعهد بالله، واستحضاراً لقول الله تعالى "وَقُل اعمَلوا فَسَيَرَى اللَّهُ عَمَلَكُم"، أن أكون أميناً في سعيي وأدفع عمولة التطبيق (2.5%) عند إتمام أي صفقة عن طريق المنصة، وإن لم أفعل فأتصدق بمثل هذا المبلغ</p>
+      </div>
+
+      <button class="btn-primary" id="su-submit" disabled onclick="submitSignup()">إنشاء الحساب</button>
+    </div>
+  </div>
+
+  <!-- ================= OTP DELIVERY CHOICE ================= -->
+  <div class="screen" id="screen-otp-choice">
+    <div class="card" style="padding-top:26px;">
+      <p style="font-size:15px; font-weight:600; text-align:center; margin-bottom:4px;">كيف تبي تستلم كود التحقق؟</p>
+      <p class="muted center" style="margin-bottom:18px;">اختر الطريقة الأسرع لك</p>
+
+      <div class="otp-method selected" id="method-whatsapp" onclick="selectOtpMethod('whatsapp')"
+        style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:10px; border:2px solid var(--blue); cursor:pointer;">
+        <span style="font-size:22px;">💬</span>
+        <div style="flex:1;">
+          <p style="font-size:13px; font-weight:600;">عبر واتساب</p>
+          <p class="muted" style="font-size:11px;">أسرع وأكثر شيوعاً</p>
+        </div>
+        <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--blue); background:var(--blue);"></div>
+      </div>
+
+      <div class="otp-method" id="method-email" onclick="selectOtpMethod('email')"
+        style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:18px; border:2px solid var(--border); cursor:pointer;">
+        <span style="font-size:22px;">✉️</span>
+        <div style="flex:1;">
+          <p style="font-size:13px; font-weight:600;">عبر البريد الإلكتروني</p>
+          <p class="muted" style="font-size:11px;">إذا ما كان واتسابك مفعّل بهذا الرقم</p>
+        </div>
+        <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid #C9CDD3;"></div>
+      </div>
+
+      <button class="btn-primary" onclick="sendOtpChosen()">إرسال الكود</button>
+    </div>
+  </div>
+
+  <!-- ================= OTP ENTRY ================= -->
+  <div class="screen" id="screen-otp">
+    <div class="card center" style="padding-top:30px;">
+      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);" id="otp-icon">✉️</div>
+      <h3 style="font-size:15px; margin-bottom:6px;" id="otp-title">تأكيد البريد الإلكتروني</h3>
+      <p class="muted" style="margin-bottom:20px;">أرسلنا كود التحقق إلى<br><b id="otp-email-display" style="color:var(--text);"></b></p>
+      <div class="otp-row">
+        <input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1">
+      </div>
+      <p class="muted" style="margin-bottom:16px;" id="otp-resend">لم يصلك الكود؟ <span class="link" onclick="resendOtp()">إعادة الإرسال</span></p>
+      <button class="btn-primary" onclick="verifyOtp()">تأكيد وإنشاء الحساب</button>
+      <p class="muted" style="margin-top:12px; line-height:1.7;" id="otp-footnote">ℹ️ رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن</p>
+    </div>
+  </div>
+
+  <!-- ================= NOTIFICATIONS ================= -->
+  <div class="screen" id="screen-notif">
+    <div class="card center" style="padding-top:30px;">
+      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);">🔔</div>
+      <h3 style="font-size:15px; margin-bottom:6px;">فعّل الإشعارات</h3>
+      <p class="muted" style="margin-bottom:20px; line-height:1.7;">عشان توصلك الرسائل من المشترين والبائعين فوراً، وتشعر لما تتوفر قطعة تدور عليها</p>
+      <button class="btn-primary" style="margin-bottom:8px;" onclick="go('terms')">تفعيل الإشعارات</button>
+      <div class="muted link" onclick="go('terms')">لاحقاً</div>
+    </div>
+  </div>
+
+  <!-- ================= TERMS ================= -->
+  <div class="screen" id="screen-terms">
+    <div class="card">
+      <h3 style="font-size:15px; margin-bottom:12px;">الشروط والأحكام</h3>
+      <div style="background:var(--bg); border-radius:8px; padding:12px; max-height:130px; overflow-y:auto; margin-bottom:14px;">
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.7; margin-bottom:8px;">سوق السكراب منصة لعرض السيارات وقطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.7;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة.</p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:16px;">
+        <input type="checkbox" id="terms-check" style="width:auto;" onchange="document.getElementById('terms-submit').disabled=!this.checked">
+        <span style="font-size:12px; color:var(--text-secondary);">قرأت ووافقت على الشروط والأحكام وسياسة الخصوصية</span>
+      </div>
+      <button class="btn-primary" id="terms-submit" disabled onclick="finishSignup()">متابعة إلى التطبيق</button>
+    </div>
+  </div>
+
+  <!-- ================= LOGIN ================= -->
+  <div class="screen" id="screen-login">
+    <div class="topbar"><span class="back" onclick="go('landing')">→</span><h2>تسجيل الدخول</h2></div>
+    <div class="card">
+      <label>رقم الجوال أو البريد الإلكتروني</label>
+      <input placeholder="example@email.com">
+      <label>كلمة المرور</label>
+      <input type="password" placeholder="••••••••">
+      <p class="link" style="font-size:12px; text-align:left; margin-bottom:16px;" onclick="go('forgot')">نسيت كلمة المرور؟</p>
+      <button class="btn-primary" style="margin-bottom:14px;" onclick="go('home')">تسجيل الدخول</button>
+      <p class="center muted">ما عندك حساب؟ <span class="link" onclick="go('signup')">إنشاء حساب جديد</span></p>
+    </div>
+  </div>
+
+  <!-- ================= FORGOT PASSWORD ================= -->
+  <div class="screen" id="screen-forgot">
+    <div class="topbar"><span class="back" onclick="go('login')">→</span><h2>استعادة كلمة المرور</h2></div>
+    <div class="card">
+      <p class="muted" style="margin-bottom:12px;">أدخل بريدك المسجل، وبنرسل لك كود تحقق</p>
+      <input placeholder="example@email.com">
+      <div class="otp-row">
+        <input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1">
+      </div>
+      <label>كلمة المرور الجديدة</label>
+      <input type="password" placeholder="8 أحرف على الأقل">
+      <button class="btn-primary" onclick="toast('تم تغيير كلمة المرور'); go('login')">تأكيد التغيير</button>
+    </div>
+  </div>
+
+  <!-- ================= HOME ================= -->
+  <div class="screen" id="screen-home">
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <select style="margin:0;">
+        <option>السعودية</option><option>الإمارات</option><option>الكويت</option>
+        <option>قطر</option><option>البحرين</option><option>عمان</option>
+      </select>
+      <select style="margin:0; flex:0 0 90px;">
+        <option>ر.س</option><option>د.إ</option><option>د.ك</option>
+      </select>
+    </div>
+    <div class="searchbar">
+      <span class="icon">🔍</span>
+      <input placeholder="ابحث عن قطعة، موديل، أو شركة">
+    </div>
+    <div class="cat-grid">
+      <div class="cat-card cat-blue" onclick="go('search')"><span class="emoji">🚗</span>سيارات كاملة</div>
+      <div class="cat-card cat-teal" onclick="go('search')"><span class="emoji">🚛</span>شاحنات وتريلات</div>
+      <div class="cat-card cat-amber" onclick="go('search')"><span class="emoji">⚙️</span>قطع غيار</div>
+      <div class="cat-card cat-coral" onclick="go('search')"><span class="emoji">🚜</span>معدات ثقيلة</div>
+    </div>
+    <h3 style="font-size:14px; margin-bottom:10px;">أحدث الإعلانات</h3>
+    <div class="listing-grid" id="home-listings"></div>
+  </div>
+
+  <!-- ================= SEARCH / PARTS ================= -->
+  <div class="screen" id="screen-search">
+    <div class="topbar"><span class="back" onclick="go('home')">→</span><h2>قطع الغيار</h2></div>
+    <div class="searchbar"><span class="icon">🔍</span><input placeholder="ابحث في قطع الغيار"></div>
+    <div class="cat-strip" id="cat-strip"></div>
+    <div id="search-header" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span style="font-size:13px; font-weight:600;">إعلانات: <span id="cat-name">زجاج</span></span>
+      <span class="muted" id="cat-count">4 نتيجة</span>
+    </div>
+    <div class="listing-grid" id="search-listings"></div>
+  </div>
+
+  <!-- ================= LISTING DETAIL ================= -->
+  <div class="screen" id="screen-detail">
+    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>تفاصيل الإعلان</h2></div>
+    <div class="card">
+      <div class="listing-thumb" style="height:150px; font-size:40px; border-radius:8px; margin-bottom:10px;" id="detail-img">📷</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <h3 id="detail-title" style="font-size:15px;"></h3>
+        <span class="badge badge-danger" id="detail-damage"></span>
+      </div>
+      <p class="muted" style="margin-bottom:10px;" id="detail-loc">📍</p>
+
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <div class="avatar" style="width:30px; height:30px; font-size:11px;">تش</div>
+        <span style="font-size:12.5px;" id="detail-seller"></span>
+        <span class="badge badge-success">✓ موثّق</span>
+        <span style="margin-right:auto; cursor:pointer;" onclick="openReportAccount()">⋮</span>
+      </div>
+
+      <div style="background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:13px;">⭐ 4.7 <span class="muted">(89 تقييم)</span></span>
+        <span class="muted" style="font-size:12px;">142 صفقة</span>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:12px; margin-bottom:10px;">
+        <span style="font-size:20px; font-weight:700;" id="detail-price"></span>
+        <div style="display:flex; gap:8px;">
+          <button style="background:transparent; border:1px solid var(--danger); color:var(--danger); padding:8px 12px; font-size:12px;" onclick="openReportListing()">🚩 إبلاغ</button>
+          <button class="btn-primary" style="width:auto; padding:10px 18px;" onclick="toast('تم فتح المحادثة (تجريبي)')">تواصل مع البائع</button>
+        </div>
+      </div>
+      <button class="btn-outline" onclick="go('commission')">تأكيد الصفقة وتسديد العمولة</button>
+    </div>
+  </div>
+
+  <!-- ================= CREATE LISTING ================= -->
+  <div class="screen" id="screen-create">
+    <div class="topbar"><span class="back" onclick="go('home')">→</span><h2>إضافة إعلان</h2></div>
+    <div class="card">
+      <label>نوع المنتج</label>
+      <div class="cat-grid" style="margin-bottom:16px;">
+        <div class="cat-card cat-blue selected" style="border:2px solid var(--blue);" onclick="selectProductType(this)"><span class="emoji">🚗</span>سيارة كاملة</div>
+        <div class="cat-card cat-teal" onclick="selectProductType(this)"><span class="emoji">🚛</span>شاحنة</div>
+        <div class="cat-card cat-amber" onclick="selectProductType(this)"><span class="emoji">⚙️</span>قطعة غيار</div>
+        <div class="cat-card cat-coral" onclick="selectProductType(this)"><span class="emoji">🚜</span>معدات ثقيلة</div>
+      </div>
+
+      <label>عنوان الإعلان</label>
+      <input id="cl-title" placeholder="مثال: مرسيدس C200 موديل 2019 مصدومة">
+
+      <label>📍 الموقع</label>
+      <div class="row2">
+        <select id="cl-country"><option>السعودية</option><option>الإمارات</option><option>الكويت</option><option>قطر</option><option>البحرين</option><option>عمان</option></select>
+        <select id="cl-city"><option>الرياض</option><option>جدة</option><option>الدمام</option></select>
+      </div>
+
+      <label>الشركة المصنعة</label>
+      <select id="cl-make"><option>مرسيدس</option><option>تويوتا</option><option>نيسان</option><option>شركة صينية</option></select>
+
+      <div class="row2">
+        <div><label>الموديل</label><input id="cl-model" placeholder="C200"></div>
+        <div><label>سنة الصنع</label><input id="cl-year" placeholder="2019"></div>
+      </div>
+
+      <label>درجة التلف</label>
+      <select id="cl-damage"><option>خفيف</option><option>متوسط</option><option>شديد</option></select>
+
+      <label>الصور والفيديو</label>
+      <div style="border:1.5px dashed #C9CDD3; border-radius:8px; padding:20px; text-align:center; margin-bottom:12px; color:var(--text-muted); font-size:12px;">
+        📷 🎥 &nbsp; اسحب الصور أو الفيديو هنا<br>
+        <span style="font-size:10.5px;">حتى 10 صور (5 ميجا) وفيديو 60 ثانية (50 ميجا)</span>
+      </div>
+
+      <label>الوصف والمميزات</label>
+      <textarea id="cl-desc" placeholder="اكتب وصف حر عن حالة السيارة والمميزات..."></textarea>
+
+      <label>السعر</label>
+      <input id="cl-price" placeholder="بالعملة المختارة">
+
+      <button class="btn-primary" onclick="publishListing()">نشر الإعلان</button>
+    </div>
+  </div>
+
+  <!-- ================= COMMISSION CALC ================= -->
+  <div class="screen" id="screen-commission">
+    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>تأكيد الصفقة وتسديد العمولة</h2></div>
+    <div class="card">
+      <label>مبلغ الصفقة</label>
+      <div class="row2">
+        <input id="deal-amount" type="number" placeholder="0" oninput="calcCommission()" style="flex:2;">
+        <select id="deal-currency" onchange="calcCommission()" style="flex:1;">
+          <option>ر.س</option><option>د.إ</option><option>د.ك</option><option>ر.ق</option><option>د.ب</option><option>ر.ع</option>
+        </select>
+      </div>
+      <div style="background:var(--bg); border-radius:8px; padding:12px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px;"><span>مبلغ الصفقة</span><span id="out-amount">0</span></div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px;"><span>نسبة العمولة</span><span>2.5%</span></div>
+        <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:6px; font-weight:700; font-size:13px;"><span>المطلوب تسديده</span><span id="out-fee" style="color:var(--blue);">0</span></div>
+      </div>
+      <p style="font-size:12px; font-weight:600; margin-bottom:8px;">التسديد عن طريق تحويل بنكي</p>
+      <div style="background:var(--bg); border-radius:8px; padding:12px; margin-bottom:16px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span class="muted">البنك</span><span>بنك الراجحي</span></div>
+        <div style="display:flex; justify-content:space-between;"><span class="muted">آيبان</span><span>SA00 0000 0000 0000</span></div>
+      </div>
+      <button class="btn-primary" style="margin-bottom:8px;" onclick="toast('تم تأكيد التسديد ✓')">تم التحويل، تأكيد التسديد</button>
+      <p class="muted center" style="font-size:11px;">التطبيق لا يستلم أي مبلغ مباشرة</p>
+    </div>
+  </div>
+
+  <!-- ================= REPORT LISTING ================= -->
+  <div class="screen" id="screen-report-listing">
+    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>الإبلاغ عن إعلان</h2></div>
+    <div class="card">
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="rl"><span>وصف مخالف للواقع</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="rl"><span>محتوى غير لائق</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="rl"><span>سبب آخر</span></div>
+      <textarea placeholder="تفاصيل إضافية (اختياري)"></textarea>
+      <button class="btn-danger btn-primary" onclick="submitReport()">إرسال البلاغ</button>
+    </div>
+  </div>
+
+  <!-- ================= REPORT ACCOUNT ================= -->
+  <div class="screen" id="screen-report-account">
+    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>الإبلاغ عن حساب</h2></div>
+    <div class="card">
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>حساب وهمي / نصب واحتيال</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>وصف الإعلانات مخالف للواقع بشكل متكرر</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>صور غير حقيقية أو منسوخة</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>استلام مبلغ دون تسليم القطعة</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>تعامل مسيء أو غير لائق</span></div>
+      <div class="reason-item" onclick="selectReason(this)"><input type="radio" name="ra"><span>سبب آخر</span></div>
+      <textarea placeholder="تفاصيل إضافية (اختياري)"></textarea>
+      <button class="btn-danger btn-primary" onclick="submitReport()">إرسال البلاغ</button>
+    </div>
+  </div>
+
+  <!-- ================= PROFILE / SETTINGS ================= -->
+  <div class="screen" id="screen-profile">
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:6px;">
+        <div class="avatar">أح</div>
+        <div><p style="font-size:14px; font-weight:600;">أحمد الشمري</p><p class="muted">ahmed@email.com</p></div>
+      </div>
+      <div class="settings-row"><span class="icon">👤</span><span>تعديل بيانات الحساب</span><span class="chev">‹</span></div>
+      <div class="settings-row"><span class="icon">👥</span><span>جهات الاتصال</span><span class="chev">‹</span></div>
+      <div class="settings-row"><span class="icon">🔔</span><span>الإشعارات</span><span class="chev">‹</span></div>
+      <div class="settings-row"><span class="icon">🔒</span><span>تغيير كلمة المرور</span><span class="chev">‹</span></div>
+      <div class="settings-row" onclick="go('support')"><span class="icon">🎧</span><span>الدعم الفني</span><span class="chev">‹</span></div>
+      <div class="settings-row"><span class="icon">📄</span><span>الشروط والأحكام</span><span class="chev">‹</span></div>
+      <div class="settings-row" style="border:none; color:var(--danger);" onclick="go('landing')"><span class="icon">🚪</span><span style="color:var(--danger);">تسجيل الخروج</span></div>
+    </div>
+  </div>
+
+  <!-- ================= SUPPORT ================= -->
+  <div class="screen" id="screen-support">
+    <div class="topbar"><span class="back" onclick="go('profile')">→</span><h2>الدعم الفني</h2></div>
+    <div class="card center">
+      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);">🎧</div>
+      <p class="muted" style="margin-bottom:20px;">عندك مشكلة أو استفسار؟ فريق الدعم جاهز يساعدك</p>
+      <div style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:10px; text-align:right;">
+        <span style="font-size:20px;">💬</span>
+        <div><p class="muted" style="font-size:11px;">واتساب</p><p style="font-weight:600; font-size:13px;">966XXXXXXXXX+</p></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:16px; text-align:right;">
+        <span style="font-size:20px;">✉️</span>
+        <div><p class="muted" style="font-size:11px;">البريد الإلكتروني</p><p style="font-weight:600; font-size:13px;">support@souqscrap.com</p></div>
+      </div>
+      <p class="muted">أوقات الرد: يومياً 9ص - 9م</p>
+    </div>
+  </div>
+
+  <!-- ================= NAVBAR ================= -->
+  <div class="navbar" id="navbar" style="display:none;">
+    <div class="nav-item active" onclick="go('home')">🏠<span>الرئيسية</span></div>
+    <div class="nav-item" onclick="go('search')">🔍<span>البحث</span></div>
+    <div class="fab" onclick="go('create')">+</div>
+    <div class="nav-item" onclick="toast('لا رسائل جديدة (تجريبي)')">💬<span>الرسائل</span></div>
+    <div class="nav-item" onclick="go('profile')">👤<span>حسابي</span></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ---------- simple in-memory "backend" using localStorage ----------
+let history = ['landing'];
+let signupData = {};
+
+const demoListings = [
+  {title:"مرسيدس C200 2019", price:"18,500 د.إ", loc:"دبي، الإمارات", damage:"مصدومة", emoji:"🚗", cat:"زجاج"},
+  {title:"زجاج أمامي مرسيدس", price:"600 د.إ", loc:"دبي، الإمارات", damage:"", emoji:"🪟", cat:"زجاج"},
+  {title:"جنط تويوتا لاندكروزر", price:"1,200 د.إ", loc:"الرياض، السعودية", damage:"", emoji:"⚙️", cat:"جنط"},
+  {title:"مصباح أمامي كامري", price:"350 ر.س", loc:"جدة، السعودية", damage:"", emoji:"💡", cat:"مصابيح"},
+  {title:"باب أمامي كامري", price:"700 د.ك", loc:"الكويت", damage:"", emoji:"🚪", cat:"أبواب"},
+  {title:"محرك مرسيدس كامل", price:"9,500 د.إ", loc:"أبوظبي، الإمارات", damage:"", emoji:"🔧", cat:"محرك"},
+];
+const categories = ["مصابيح","زجاج","أبواب","شاصي","محرك","داخلية","جنط","فرامل","صدامات","كهرباء","تكييف"];
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+  history.push(id);
+  const navScreens = ['home','search','create','profile'];
+  document.getElementById('navbar').style.display = navScreens.includes(id) ? 'flex':'none';
+  if(id==='home') renderHome();
+  if(id==='search') renderSearch('زجاج');
+  window.scrollTo(0,0);
+}
+function goBack(){
+  history.pop();
+  const prev = history.pop() || 'home';
+  go(prev);
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ---- signup flow ----
+let accountType = 'trader';
+function selectType(type){
+  accountType = type;
+  document.getElementById('type-trader').classList.toggle('selected', type==='trader');
+  document.getElementById('type-buyer').classList.toggle('selected', type==='buyer');
+}
+function checkSignupValid(){
+  document.getElementById('su-submit').disabled = !document.getElementById('su-pledge').checked;
+}
+let chosenOtpMethod = 'whatsapp';
+function submitSignup(){
+  const email = document.getElementById('su-email').value || 'ahmed@email.com';
+  const phone = document.getElementById('su-code').value + document.getElementById('su-phone').value;
+  signupData = { name: document.getElementById('su-name').value, email, phone };
+  go('otp-choice');
+}
+function selectOtpMethod(method){
+  chosenOtpMethod = method;
+  document.getElementById('method-whatsapp').style.borderColor = method==='whatsapp' ? 'var(--blue)' : 'var(--border)';
+  document.getElementById('method-email').style.borderColor = method==='email' ? 'var(--blue)' : 'var(--border)';
+  document.querySelector('#method-whatsapp .otp-radio').style.background = method==='whatsapp' ? 'var(--blue)' : 'transparent';
+  document.querySelector('#method-whatsapp .otp-radio').style.borderColor = method==='whatsapp' ? 'var(--blue)' : '#C9CDD3';
+  document.querySelector('#method-email .otp-radio').style.background = method==='email' ? 'var(--blue)' : 'transparent';
+  document.querySelector('#method-email .otp-radio').style.borderColor = method==='email' ? 'var(--blue)' : '#C9CDD3';
+}
+function sendOtpChosen(){
+  if(chosenOtpMethod === 'whatsapp'){
+    document.getElementById('otp-icon').textContent = '💬';
+    document.getElementById('otp-title').textContent = 'تأكيد رقم الجوال';
+    document.getElementById('otp-email-display').textContent = signupData.phone || '+966 5X XXX XXXX';
+    document.getElementById('otp-footnote').innerHTML = 'ℹ️ بريدك الإلكتروني محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
+    toast('تم إرسال كود التحقق عبر واتساب (تجريبي: 1234)');
+  } else {
+    document.getElementById('otp-icon').textContent = '✉️';
+    document.getElementById('otp-title').textContent = 'تأكيد البريد الإلكتروني';
+    document.getElementById('otp-email-display').textContent = signupData.email;
+    document.getElementById('otp-footnote').innerHTML = 'ℹ️ رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
+    toast('تم إرسال كود التحقق للبريد (تجريبي: 1234)');
+  }
+  go('otp');
+}
+function resendOtp(){ toast('تم إعادة إرسال الكود'); }
+function verifyOtp(){ toast('تم تأكيد البريد ✓'); go('notif'); }
+function finishSignup(){ toast('تم إنشاء الحساب بنجاح 🎉'); go('home'); }
+
+// ---- home / search ----
+function renderHome(){
+  const el = document.getElementById('home-listings');
+  el.innerHTML = demoListings.slice(0,4).map(listingCard).join('');
+}
+function listingCard(l){
+  return `<div class="listing-card" onclick='openDetail(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
+    <div class="listing-thumb">${l.emoji}</div>
+    <div class="listing-info">
+      <div class="title">${l.title}</div>
+      <div class="price">${l.price}</div>
+      <div class="loc">📍 ${l.loc}</div>
+    </div>
+  </div>`;
+}
+function renderCatStrip(active){
+  const strip = document.getElementById('cat-strip');
+  strip.innerHTML = categories.map(c=>`<div class="cat-chip ${c===active?'selected':''}" onclick="renderSearch('${c}')">${c}</div>`).join('');
+}
+function renderSearch(cat){
+  renderCatStrip(cat);
+  document.getElementById('cat-name').textContent = cat;
+  const items = demoListings.filter(l=>l.cat===cat);
+  document.getElementById('cat-count').textContent = items.length + ' نتيجة';
+  document.getElementById('search-listings').innerHTML = items.length ? items.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد نتائج بعد</p>';
+}
+
+let currentListing = null;
+function openDetail(l){
+  currentListing = l;
+  document.getElementById('detail-img').textContent = l.emoji;
+  document.getElementById('detail-title').textContent = l.title;
+  document.getElementById('detail-damage').textContent = l.damage || '—';
+  document.getElementById('detail-damage').style.display = l.damage ? 'inline-flex':'none';
+  document.getElementById('detail-loc').textContent = '📍 ' + l.loc;
+  document.getElementById('detail-seller').textContent = 'تشليح الوصل';
+  document.getElementById('detail-price').textContent = l.price;
+  go('detail');
+}
+
+// ---- create listing ----
+function selectProductType(el){
+  document.querySelectorAll('#screen-create .cat-card').forEach(c=>c.style.border='none');
+  el.style.border = '2px solid var(--blue)';
+}
+function publishListing(){
+  const title = document.getElementById('cl-title').value || 'إعلان بدون عنوان';
+  const price = document.getElementById('cl-price').value || '0';
+  demoListings.unshift({title, price: price+' ر.س', loc: document.getElementById('cl-city').value+'، '+document.getElementById('cl-country').value, damage: document.getElementById('cl-damage').value, emoji:'🚗', cat:'زجاج'});
+  toast('تم نشر الإعلان بنجاح ✓');
+  go('home');
+}
+
+// ---- commission calc ----
+function calcCommission(){
+  const amt = parseFloat(document.getElementById('deal-amount').value) || 0;
+  const cur = document.getElementById('deal-currency').value;
+  document.getElementById('out-amount').textContent = amt.toLocaleString() + ' ' + cur;
+  document.getElementById('out-fee').textContent = (amt*0.025).toLocaleString(undefined,{maximumFractionDigits:2}) + ' ' + cur;
+}
+
+// ---- reports ----
+function openReportListing(){ go('report-listing'); }
+function openReportAccount(){ go('report-account'); }
+function selectReason(el){
+  el.parentElement.querySelectorAll('.reason-item').forEach(r=>r.classList.remove('selected'));
+  el.classList.add('selected');
+  el.querySelector('input').checked = true;
+}
+function submitReport(){ toast('تم إرسال البلاغ، سيراجعه فريقنا'); goBack(); }
+
+renderHome();
+</script>
+</body>
+</html>
