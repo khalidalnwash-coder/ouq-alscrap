@@ -88,6 +88,15 @@ function hideError(elId) {
   document.getElementById(elId).style.display = 'none';
 }
 
+// ---------- icons ----------
+function icon(name, cls = '') {
+  return `<i data-lucide="${name}" class="icon ${cls}"></i>`;
+}
+function refreshIcons() {
+  if (window.lucide) lucide.createIcons();
+}
+refreshIcons();
+
 // ---------- bootstrap ----------
 async function bootstrap() {
   try {
@@ -157,16 +166,17 @@ async function sendOtpChosen() {
   try {
     const res = await api('/auth/signup', { method: 'POST', body: { ...signupData, otp_channel: chosenOtpMethod } });
     pendingUserId = res.user_id;
+    document.querySelectorAll('#otp-icon [data-otp-icon]').forEach((el) => {
+      el.hidden = el.dataset.otpIcon !== chosenOtpMethod;
+    });
     if (chosenOtpMethod === 'whatsapp') {
-      document.getElementById('otp-icon').textContent = '💬';
       document.getElementById('otp-title').textContent = 'تأكيد رقم الجوال';
       document.getElementById('otp-email-display').textContent = res.otp_destination;
-      document.getElementById('otp-footnote').innerHTML = 'ℹ️ بريدك الإلكتروني محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
+      document.getElementById('otp-footnote-text').textContent = 'بريدك الإلكتروني محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
     } else {
-      document.getElementById('otp-icon').textContent = '✉️';
       document.getElementById('otp-title').textContent = 'تأكيد البريد الإلكتروني';
       document.getElementById('otp-email-display').textContent = res.otp_destination;
-      document.getElementById('otp-footnote').innerHTML = 'ℹ️ رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
+      document.getElementById('otp-footnote-text').textContent = 'رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
     }
     toast(`تم إرسال كود التحقق (تجريبي: ${res.dev_otp_code})`);
     startOtpResendCountdown();
@@ -210,7 +220,7 @@ async function verifyOtp() {
     const res = await api('/auth/otp/verify', { method: 'POST', body: { user_id: pendingUserId, code } });
     setToken(res.token);
     currentUser = res.user;
-    toast('تم تأكيد الحساب ✓');
+    toast('تم تأكيد الحساب');
     go('notif');
   } catch (err) {
     showError('otp-error', err.message);
@@ -230,7 +240,7 @@ async function finishSignup() {
   try {
     const res = await api('/auth/accept-terms', { method: 'PATCH' });
     currentUser = res.user;
-    toast('تم إنشاء الحساب بنجاح 🎉');
+    toast('تم إنشاء الحساب بنجاح');
     go('home');
   } catch (err) {
     toast(err.message);
@@ -254,7 +264,7 @@ async function submitLogin() {
     const res = await api('/auth/login', { method: 'POST', body: { identifier, password } });
     setToken(res.token);
     currentUser = res.user;
-    toast(`أهلاً ${res.user.full_name.split(' ')[0]} 👋`);
+    toast(`أهلاً ${res.user.full_name.split(' ')[0]}`);
     go('home');
   } catch (err) {
     showError('li-error', err.message);
@@ -295,7 +305,7 @@ async function confirmForgotOtp() {
   if (code.length !== 4) return showError('fp-error2', 'أدخل الكود المكوّن من 4 أرقام');
   try {
     await api('/auth/forgot-password/confirm', { method: 'POST', body: { user_id: fpUserId, code, new_password } });
-    toast('تم تغيير كلمة المرور ✓');
+    toast('تم تغيير كلمة المرور');
     document.getElementById('forgot-step1').style.display = 'block';
     document.getElementById('forgot-step2').style.display = 'none';
     go('login');
@@ -308,13 +318,13 @@ async function confirmForgotOtp() {
 function listingCard(l) {
   const thumb = l.thumbnail_url
     ? `<img src="${l.thumbnail_url}" alt="">`
-    : '📦';
+    : icon('package', 'icon-lg');
   return `<div class="listing-card" onclick="openDetail('${l.id}')">
     <div class="listing-thumb">${thumb}</div>
     <div class="listing-info">
       <div class="title">${escapeHtml(l.title)}</div>
       <div class="price">${formatPrice(l.price, l.currency)}</div>
-      <div class="loc">📍 ${escapeHtml(l.city)}</div>
+      <div class="loc">${icon('map-pin')} ${escapeHtml(l.city)}</div>
     </div>
   </div>`;
 }
@@ -329,12 +339,13 @@ function escapeHtml(s) {
 // ---------- home ----------
 async function renderHome() {
   const el = document.getElementById('home-listings');
-  el.innerHTML = '<div class="spinner-wrap">جارِ التحميل...</div>';
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listings } = await api('/listings');
     el.innerHTML = listings.length
       ? listings.slice(0, 6).map(listingCard).join('')
       : '<p class="muted" style="grid-column:1/-1;">لا توجد إعلانات بعد</p>';
+    refreshIcons();
   } catch (err) {
     el.innerHTML = `<p class="muted" style="grid-column:1/-1;">تعذّر تحميل الإعلانات</p>`;
   }
@@ -372,11 +383,12 @@ async function renderSearch() {
   if (selectedPartCategory) params.set('part_category', selectedPartCategory);
 
   const el = document.getElementById('search-listings');
-  el.innerHTML = '<div class="spinner-wrap">جارِ التحميل...</div>';
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listings } = await api('/listings?' + params.toString());
     document.getElementById('cat-count').textContent = listings.length + ' نتيجة';
     el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد نتائج بعد</p>';
+    refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر تحميل النتائج</p>';
   }
@@ -387,44 +399,45 @@ async function openDetail(id) {
   currentListingId = id;
   go('detail');
   const body = document.getElementById('detail-body');
-  body.innerHTML = '<div class="spinner-wrap">جارِ التحميل...</div>';
+  body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listing, seller } = await api('/listings/' + id);
     const img = listing.media[0]
       ? `<img src="${listing.media[0].url}" style="width:100%; height:100%; object-fit:cover;">`
-      : '📷';
+      : icon('image', 'icon-xl');
     const compatBits = [listing.compatible_make, listing.compatible_model].filter(Boolean).join(' ');
     const yearRange = listing.compatible_year_from || listing.compatible_year_to
       ? `${listing.compatible_year_from || ''}${listing.compatible_year_from && listing.compatible_year_to ? '–' : ''}${listing.compatible_year_to || ''}`
       : '';
 
     body.innerHTML = `
-      <div class="listing-thumb" style="height:180px; font-size:40px; border-radius:8px; margin-bottom:10px;">${img}</div>
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-        <h3 style="font-size:15px;">${escapeHtml(listing.title)}</h3>
+      <div class="listing-thumb" style="height:190px; border-radius:var(--radius-sm); margin-bottom:12px;">${img}</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:8px;">
+        <h3 style="font-size:var(--fs-md); font-weight:700;">${escapeHtml(listing.title)}</h3>
         <span class="badge badge-warning">${escapeHtml(listing.part_category || '')}</span>
       </div>
-      ${compatBits || yearRange ? `<p class="muted" style="margin-bottom:6px;">🔧 ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>` : ''}
-      <p class="muted" style="margin-bottom:10px;">📍 ${escapeHtml(listing.city)}</p>
-      ${listing.description ? `<p style="font-size:13px; line-height:1.7; margin-bottom:12px;">${escapeHtml(listing.description)}</p>` : ''}
+      ${compatBits || yearRange ? `<p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">${icon('wrench', 'icon-xs')} ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>` : ''}
+      <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">${icon('map-pin', 'icon-xs')} ${escapeHtml(listing.city)}</p>
+      ${listing.description ? `<p style="font-size:var(--fs-base); line-height:1.7; margin-bottom:14px;">${escapeHtml(listing.description)}</p>` : ''}
 
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;" onclick="openSeller('${seller.id}')">
-        <div class="avatar" style="width:30px; height:30px; font-size:11px;">${initials(seller.full_name)}</div>
-        <span style="font-size:12.5px;">${escapeHtml(seller.full_name)}</span>
-        ${seller.is_verified_trader ? '<span class="badge badge-success">✓ موثّق</span>' : ''}
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;" onclick="openSeller('${seller.id}')">
+        <div class="avatar" style="width:32px; height:32px; font-size:var(--fs-xs);">${initials(seller.full_name)}</div>
+        <span style="font-size:var(--fs-sm); font-weight:500;">${escapeHtml(seller.full_name)}</span>
+        ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}
       </div>
 
-      <div style="background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:13px;">⭐ ${seller.rating_avg.toFixed(1)}</span>
-        <span class="muted" style="font-size:12px;">${seller.completed_deals_count} صفقة</span>
+      <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
+        <span class="muted">${seller.completed_deals_count} صفقة</span>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:12px; margin-bottom:10px;">
-        <span style="font-size:20px; font-weight:700;">${formatPrice(listing.price, listing.currency)}</span>
-        <button class="btn-primary" style="width:auto; padding:10px 18px;" onclick="contactSeller('${seller.id}')">تواصل مع البائع</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-bottom:12px; gap:10px;">
+        <span style="font-size:var(--fs-xl); font-weight:700; color:var(--blue);">${formatPrice(listing.price, listing.currency)}</span>
+        <button class="btn-primary" style="width:auto; padding:11px 20px;" onclick="contactSeller('${seller.id}')">تواصل مع البائع</button>
       </div>
       <div id="contact-reveal"></div>
     `;
+    refreshIcons();
   } catch (err) {
     body.innerHTML = `<p class="muted">تعذّر تحميل الإعلان: ${escapeHtml(err.message)}</p>`;
   }
@@ -443,11 +456,13 @@ async function contactSeller(sellerId) {
     const waLink = `https://wa.me/${res.phone.replace('+', '')}`;
     document.getElementById('contact-reveal').innerHTML = `
       <div class="pledge-box" style="margin-top:10px;">
-        <p style="font-size:13px; line-height:1.9;">
-          📞 <b>${res.phone}</b><br>
+        ${icon('phone', 'icon-sm icon-top-align')}
+        <p style="font-size:var(--fs-base); line-height:1.9;">
+          <b>${res.phone}</b><br>
           ${res.whatsapp_verified ? `<a href="${waLink}" target="_blank" class="link">تواصل عبر واتساب</a>` : 'راسل البائع أو اتصل به مباشرة'}
         </p>
       </div>`;
+    refreshIcons();
   } catch (err) {
     toast(err.message);
   }
@@ -483,8 +498,9 @@ function onImagesSelected(e) {
 function renderThumbs() {
   const el = document.getElementById('cl-thumbs');
   el.innerHTML = selectedImages
-    .map((f, i) => `<div class="thumb"><img src="${URL.createObjectURL(f)}"><span class="rm" onclick="removeImage(${i})">✕</span></div>`)
+    .map((f, i) => `<div class="thumb"><img src="${URL.createObjectURL(f)}"><span class="rm" onclick="removeImage(${i})">${icon('x')}</span></div>`)
     .join('');
+  refreshIcons();
 }
 function removeImage(i) {
   selectedImages.splice(i, 1);
@@ -516,7 +532,7 @@ async function publishListing() {
   btn.textContent = 'جارِ النشر...';
   try {
     await api('/listings', { method: 'POST', body: fd, isForm: true });
-    toast('تم نشر الإعلان بنجاح ✓');
+    toast('تم نشر الإعلان بنجاح');
     go('home');
   } catch (err) {
     showError('cl-error', err.message);
@@ -531,26 +547,27 @@ async function openSeller(id) {
   go('seller');
   const body = document.getElementById('seller-body');
   const listingsEl = document.getElementById('seller-listings');
-  body.innerHTML = '<div class="spinner-wrap">جارِ التحميل...</div>';
+  body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   listingsEl.innerHTML = '';
   try {
     const { seller, listings } = await api('/users/' + id + '/public');
     body.innerHTML = `
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-        <div class="avatar">${initials(seller.full_name)}</div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div class="avatar" style="width:48px; height:48px; font-size:var(--fs-base);">${initials(seller.full_name)}</div>
         <div>
-          <p style="font-size:14px; font-weight:600;">${escapeHtml(seller.full_name)} ${seller.is_verified_trader ? '<span class="badge badge-success">✓ موثّق</span>' : ''}</p>
+          <p style="font-size:var(--fs-base); font-weight:700; display:flex; align-items:center; gap:6px;">${escapeHtml(seller.full_name)} ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}</p>
           <p class="muted">${seller.account_type === 'trader' ? 'تشليح / تاجر' : 'فرد / مشتري'}</p>
         </div>
       </div>
-      <div style="background:var(--bg); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between;">
-        <span style="font-size:13px;">⭐ ${seller.rating_avg.toFixed(1)}</span>
-        <span class="muted" style="font-size:12px;">${seller.completed_deals_count} صفقة مكتملة</span>
+      <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
+        <span class="muted">${seller.completed_deals_count} صفقة مكتملة</span>
       </div>
     `;
     listingsEl.innerHTML = listings.length
       ? listings.map(listingCard).join('')
       : '<p class="muted" style="grid-column:1/-1;">لا توجد إعلانات نشطة</p>';
+    refreshIcons();
   } catch (err) {
     body.innerHTML = `<p class="muted">تعذّر تحميل البروفايل</p>`;
   }
@@ -585,20 +602,20 @@ async function renderAdmin() {
   if (!currentUser || !currentUser.is_admin) { toast('صلاحية مسؤول مطلوبة'); return go('profile'); }
   const statsEl = document.getElementById('admin-stats');
   const usersEl = document.getElementById('admin-users');
-  statsEl.innerHTML = '<div class="spinner-wrap">جارِ التحميل...</div>';
+  statsEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   usersEl.innerHTML = '';
   try {
     const stats = await api('/admin/stats');
     statsEl.innerHTML = `
-      <h3 style="font-size:14px; margin-bottom:10px;">إحصائيات سريعة</h3>
-      <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;"><span class="muted">مستخدمون نشطون</span><span>${stats.active_users_count}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;"><span class="muted">إعلانات اليوم</span><span>${stats.listings_posted_today}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:12.5px;"><span class="muted">إجمالي الإعلانات النشطة</span><span>${stats.active_listings_count}</span></div>
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إحصائيات سريعة</h3>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">مستخدمون نشطون</span><span style="font-weight:600;">${stats.active_users_count}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">إعلانات اليوم</span><span style="font-weight:600;">${stats.listings_posted_today}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm);"><span class="muted">إجمالي الإعلانات النشطة</span><span style="font-weight:600;">${stats.active_listings_count}</span></div>
     `;
     const { users } = await api('/admin/users');
-    usersEl.innerHTML = '<h3 style="font-size:14px; margin-bottom:10px;">إدارة الحسابات</h3>' + users.map((u) => `
+    usersEl.innerHTML = '<h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إدارة الحسابات</h3>' + users.map((u) => `
       <div class="settings-row">
-        <span class="icon">${u.status === 'active' ? '🟢' : '🔴'}</span>
+        <span class="status-dot ${u.status === 'active' ? 'status-dot-success' : 'status-dot-danger'}"></span>
         <span>${escapeHtml(u.full_name)}<br><span class="muted">${escapeHtml(u.email)}</span></span>
         <button class="btn-ghost" style="border:1px solid var(--border);" onclick="toggleUserStatus('${u.id}','${u.status}')">${u.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
       </div>

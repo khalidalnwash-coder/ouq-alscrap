@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سوق السكراب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,10 +15,13 @@
   <!-- ================= LANDING ================= -->
   <div class="screen active" id="screen-landing">
     <div style="padding-top:60px;">
-      <div class="card center" style="padding:40px 24px;">
-        <div class="logo-icon">🚗</div>
-        <h1 style="font-size:20px; margin-bottom:4px;">سوق السكراب</h1>
-        <p class="muted" style="margin-bottom:26px;">قطع غيار سيارات — السعودية (مرحلة تجريبية)</p>
+      <div class="card center" style="padding:44px 24px;">
+        <div class="logo-icon">
+          <i data-lucide="car" class="icon"></i>
+          <span class="logo-badge"><i data-lucide="settings" class="icon"></i></span>
+        </div>
+        <h1 style="font-size:var(--fs-xl); font-weight:700; margin-bottom:6px;">سوق السكراب</h1>
+        <p class="muted" style="margin-bottom:30px;">قطع غيار سيارات — السعودية (مرحلة تجريبية)</p>
         <button class="btn-primary" style="margin-bottom:10px;" onclick="go('signup')">إنشاء حساب جديد</button>
         <button class="btn-outline" style="margin-bottom:18px;" onclick="go('login')">تسجيل الدخول</button>
         <div class="muted link" onclick="go('home')">تصفّح بدون تسجيل</div>
@@ -25,7 +31,7 @@
 
   <!-- ================= SIGNUP ================= -->
   <div class="screen" id="screen-signup">
-    <div class="topbar"><span class="back" onclick="go('landing')">→</span><h2>إنشاء حساب جديد</h2></div>
+    <div class="topbar"><span class="back" onclick="go('landing')"><i data-lucide="chevron-right" class="icon"></i></span><h2>إنشاء حساب جديد</h2></div>
     <div class="card">
       <label>الاسم الكامل</label>
       <input id="su-name" placeholder="اسمك الثلاثي أو اسم المحل">
@@ -49,7 +55,12 @@
 
       <div class="row2">
         <div><label>العمر</label><input id="su-age" type="number" placeholder="30"></div>
-        <div><label>الدولة</label><input value="🇸🇦 السعودية" disabled></div>
+        <div>
+          <label>الدولة</label>
+          <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); font-size:var(--fs-base); margin-bottom:14px;">
+            <i data-lucide="map-pin" class="icon icon-sm icon-muted"></i> السعودية
+          </div>
+        </div>
       </div>
 
       <label>كلمة المرور</label>
@@ -67,25 +78,25 @@
   <!-- ================= OTP DELIVERY CHOICE ================= -->
   <div class="screen" id="screen-otp-choice">
     <div class="card" style="padding-top:26px;">
-      <p style="font-size:15px; font-weight:600; text-align:center; margin-bottom:4px;">كيف تبي تستلم كود التحقق؟</p>
-      <p class="muted center" style="margin-bottom:18px;">اختر الطريقة الأسرع لك</p>
+      <p style="font-size:var(--fs-md); font-weight:700; text-align:center; margin-bottom:4px;">كيف تبي تستلم كود التحقق؟</p>
+      <p class="muted center" style="margin-bottom:20px;">اختر الطريقة الأسرع لك</p>
 
       <div id="method-whatsapp" onclick="selectOtpMethod('whatsapp')"
-        style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:10px; border:2px solid var(--blue); cursor:pointer;">
-        <span style="font-size:22px;">💬</span>
+        style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius); padding:15px; margin-bottom:10px; border:2px solid var(--blue); cursor:pointer;">
+        <i data-lucide="message-circle" class="icon icon-lg" style="color:var(--blue);"></i>
         <div style="flex:1;">
-          <p style="font-size:13px; font-weight:600;">عبر واتساب</p>
-          <p class="muted" style="font-size:11px;">أسرع وأكثر شيوعاً</p>
+          <p style="font-size:var(--fs-base); font-weight:600;">عبر واتساب</p>
+          <p class="muted" style="font-size:var(--fs-xs);">أسرع وأكثر شيوعاً</p>
         </div>
         <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--blue); background:var(--blue);"></div>
       </div>
 
       <div id="method-email" onclick="selectOtpMethod('email')"
-        style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:18px; border:2px solid var(--border); cursor:pointer;">
-        <span style="font-size:22px;">✉️</span>
+        style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius); padding:15px; margin-bottom:20px; border:2px solid var(--border); cursor:pointer;">
+        <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
         <div style="flex:1;">
-          <p style="font-size:13px; font-weight:600;">عبر البريد الإلكتروني</p>
-          <p class="muted" style="font-size:11px;">إذا ما كان واتسابك مفعّل بهذا الرقم</p>
+          <p style="font-size:var(--fs-base); font-weight:600;">عبر البريد الإلكتروني</p>
+          <p class="muted" style="font-size:var(--fs-xs);">إذا ما كان واتسابك مفعّل بهذا الرقم</p>
         </div>
         <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid #C9CDD3;"></div>
       </div>
@@ -96,27 +107,33 @@
 
   <!-- ================= OTP ENTRY ================= -->
   <div class="screen" id="screen-otp">
-    <div class="card center" style="padding-top:30px;">
-      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);" id="otp-icon">✉️</div>
-      <h3 style="font-size:15px; margin-bottom:6px;" id="otp-title">تأكيد البريد الإلكتروني</h3>
-      <p class="muted" style="margin-bottom:20px;">أرسلنا كود التحقق إلى<br><b id="otp-email-display" style="color:var(--text);"></b></p>
+    <div class="card center" style="padding-top:32px;">
+      <div class="logo-icon" style="background:var(--blue-light); box-shadow:none; color:var(--blue);" id="otp-icon">
+        <i data-lucide="mail" class="icon icon-lg" data-otp-icon="email"></i>
+        <i data-lucide="message-circle" class="icon icon-lg" data-otp-icon="whatsapp" hidden></i>
+      </div>
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:6px;" id="otp-title">تأكيد البريد الإلكتروني</h3>
+      <p class="muted" style="margin-bottom:22px;">أرسلنا كود التحقق إلى<br><b id="otp-email-display" style="color:var(--text);"></b></p>
       <div class="otp-row">
         <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
       </div>
       <p class="error-text" id="otp-error" style="display:none;"></p>
-      <p class="muted" style="margin-bottom:16px;" id="otp-resend">لم يصلك الكود؟ <span class="link" onclick="resendOtp()">إعادة الإرسال</span></p>
+      <p class="muted" style="margin-bottom:18px;" id="otp-resend">لم يصلك الكود؟ <span class="link" onclick="resendOtp()">إعادة الإرسال</span></p>
       <button class="btn-primary" onclick="verifyOtp()">تأكيد وإنشاء الحساب</button>
-      <p class="muted" style="margin-top:12px; line-height:1.7;" id="otp-footnote">ℹ️ رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن</p>
+      <p class="muted" style="margin-top:14px; line-height:1.7; display:flex; align-items:flex-start; gap:6px; justify-content:center;">
+        <i data-lucide="info" class="icon icon-xs icon-muted" style="margin-top:2px;"></i>
+        <span id="otp-footnote-text">رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن</span>
+      </p>
     </div>
   </div>
 
   <!-- ================= NOTIFICATIONS ================= -->
   <div class="screen" id="screen-notif">
-    <div class="card center" style="padding-top:30px;">
-      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);">🔔</div>
-      <h3 style="font-size:15px; margin-bottom:6px;">فعّل الإشعارات</h3>
-      <p class="muted" style="margin-bottom:20px; line-height:1.7;">عشان توصلك الرسائل من المشترين والبائعين فوراً، وتشعر لما تتوفر قطعة تدور عليها</p>
-      <button class="btn-primary" style="margin-bottom:8px;" onclick="enableNotifications(true)">تفعيل الإشعارات</button>
+    <div class="card center" style="padding-top:32px;">
+      <div class="logo-icon" style="background:var(--blue-light); box-shadow:none; color:var(--blue);"><i data-lucide="bell" class="icon icon-lg"></i></div>
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:6px;">فعّل الإشعارات</h3>
+      <p class="muted" style="margin-bottom:22px; line-height:1.7;">عشان توصلك الرسائل من المشترين والبائعين فوراً، وتشعر لما تتوفر قطعة تدور عليها</p>
+      <button class="btn-primary" style="margin-bottom:10px;" onclick="enableNotifications(true)">تفعيل الإشعارات</button>
       <div class="muted link" onclick="enableNotifications(false)">لاحقاً</div>
     </div>
   </div>
@@ -124,14 +141,14 @@
   <!-- ================= TERMS ================= -->
   <div class="screen" id="screen-terms">
     <div class="card">
-      <h3 style="font-size:15px; margin-bottom:12px;">الشروط والأحكام</h3>
-      <div style="background:var(--bg); border-radius:8px; padding:12px; max-height:130px; overflow-y:auto; margin-bottom:14px;">
-        <p style="font-size:12px; color:var(--text-secondary); line-height:1.7; margin-bottom:8px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
-        <p style="font-size:12px; color:var(--text-secondary); line-height:1.7;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة (تُفعَّل شاشة تسديد العمولة في مرحلة لاحقة من التطبيق).</p>
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:14px;">الشروط والأحكام</h3>
+      <div style="background:var(--bg); border-radius:var(--radius-sm); padding:14px; max-height:130px; overflow-y:auto; margin-bottom:16px;">
+        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
+        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة (تُفعَّل شاشة تسديد العمولة في مرحلة لاحقة من التطبيق).</p>
       </div>
-      <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:16px;">
-        <input type="checkbox" id="terms-check" style="width:auto;" onchange="document.getElementById('terms-submit').disabled=!this.checked">
-        <span style="font-size:12px; color:var(--text-secondary);">قرأت ووافقت على الشروط والأحكام وسياسة الخصوصية</span>
+      <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:18px;">
+        <input type="checkbox" id="terms-check" style="width:auto; accent-color:var(--blue);" onchange="document.getElementById('terms-submit').disabled=!this.checked">
+        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">قرأت ووافقت على الشروط والأحكام وسياسة الخصوصية</span>
       </div>
       <button class="btn-primary" id="terms-submit" disabled onclick="finishSignup()">متابعة إلى التطبيق</button>
     </div>
@@ -139,33 +156,33 @@
 
   <!-- ================= TERMS (READ-ONLY VIEW) ================= -->
   <div class="screen" id="screen-terms-view">
-    <div class="topbar"><span class="back" onclick="go('profile')">→</span><h2>الشروط والأحكام</h2></div>
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الشروط والأحكام</h2></div>
     <div class="card">
-      <p style="font-size:12px; color:var(--text-secondary); line-height:1.8; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
-      <p style="font-size:12px; color:var(--text-secondary); line-height:1.8;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة.</p>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة.</p>
     </div>
   </div>
 
   <!-- ================= LOGIN ================= -->
   <div class="screen" id="screen-login">
-    <div class="topbar"><span class="back" onclick="go('landing')">→</span><h2>تسجيل الدخول</h2></div>
+    <div class="topbar"><span class="back" onclick="go('landing')"><i data-lucide="chevron-right" class="icon"></i></span><h2>تسجيل الدخول</h2></div>
     <div class="card">
       <label>رقم الجوال أو البريد الإلكتروني</label>
       <input id="li-identifier" placeholder="example@email.com">
       <label>كلمة المرور</label>
       <input id="li-pass" type="password" placeholder="••••••••">
       <p class="error-text" id="li-error" style="display:none;"></p>
-      <p class="link" style="font-size:12px; text-align:left; margin-bottom:16px;" onclick="go('forgot')">نسيت كلمة المرور؟</p>
-      <button class="btn-primary" style="margin-bottom:14px;" onclick="submitLogin()">تسجيل الدخول</button>
+      <p class="link" style="font-size:var(--fs-sm); text-align:left; margin-bottom:18px;" onclick="go('forgot')">نسيت كلمة المرور؟</p>
+      <button class="btn-primary" style="margin-bottom:16px;" onclick="submitLogin()">تسجيل الدخول</button>
       <p class="center muted">ما عندك حساب؟ <span class="link" onclick="go('signup')">إنشاء حساب جديد</span></p>
     </div>
   </div>
 
   <!-- ================= FORGOT PASSWORD ================= -->
   <div class="screen" id="screen-forgot">
-    <div class="topbar"><span class="back" onclick="go('login')">→</span><h2>استعادة كلمة المرور</h2></div>
+    <div class="topbar"><span class="back" onclick="go('login')"><i data-lucide="chevron-right" class="icon"></i></span><h2>استعادة كلمة المرور</h2></div>
     <div class="card" id="forgot-step1">
-      <p class="muted" style="margin-bottom:12px;">أدخل بريدك أو جوالك المسجل، وبنرسل لك كود تحقق</p>
+      <p class="muted" style="margin-bottom:14px;">أدخل بريدك أو جوالك المسجل، وبنرسل لك كود تحقق</p>
       <input id="fp-identifier" placeholder="example@email.com">
       <div class="toggle-group">
         <div class="toggle-opt selected" id="fp-method-whatsapp" onclick="selectFpMethod('whatsapp')">واتساب</div>
@@ -187,28 +204,30 @@
 
   <!-- ================= HOME ================= -->
   <div class="screen" id="screen-home">
-    <p class="muted" style="margin-bottom:10px;">📍 السعودية · قطع غيار سيارات</p>
+    <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+      <i data-lucide="map-pin" class="icon icon-xs icon-muted"></i> السعودية · قطع غيار سيارات
+    </p>
     <div class="searchbar">
-      <span class="icon">🔍</span>
+      <i data-lucide="search" class="icon"></i>
       <input id="home-search" placeholder="ابحث عن قطعة، موديل، أو شركة" onkeydown="if(event.key==='Enter')homeSearch()">
     </div>
     <div class="cat-grid">
-      <div class="cat-card cat-blue selected" onclick="go('search')"><span class="emoji">⚙️</span>قطع غيار</div>
-      <div class="cat-card cat-teal disabled" onclick="toast('قريباً — سيارات كاملة (مرحلة لاحقة)')"><span class="emoji">🚗</span>سيارات كاملة</div>
-      <div class="cat-card cat-amber disabled" onclick="toast('قريباً — شاحنات وتريلات (مرحلة لاحقة)')"><span class="emoji">🚛</span>شاحنات وتريلات</div>
-      <div class="cat-card cat-coral disabled" onclick="toast('قريباً — معدات ثقيلة (مرحلة لاحقة)')"><span class="emoji">🚜</span>معدات ثقيلة</div>
+      <div class="cat-card selected" onclick="go('search')"><i data-lucide="wrench" class="icon"></i>قطع غيار</div>
+      <div class="cat-card disabled" onclick="toast('قريباً — سيارات كاملة (مرحلة لاحقة)')"><i data-lucide="car" class="icon"></i>سيارات كاملة</div>
+      <div class="cat-card disabled" onclick="toast('قريباً — شاحنات وتريلات (مرحلة لاحقة)')"><i data-lucide="truck" class="icon"></i>شاحنات وتريلات</div>
+      <div class="cat-card disabled" onclick="toast('قريباً — معدات ثقيلة (مرحلة لاحقة)')"><i data-lucide="package" class="icon"></i>معدات ثقيلة</div>
     </div>
-    <h3 style="font-size:14px; margin-bottom:10px;">أحدث الإعلانات</h3>
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">أحدث الإعلانات</h3>
     <div class="listing-grid" id="home-listings"></div>
   </div>
 
   <!-- ================= SEARCH / PARTS ================= -->
   <div class="screen" id="screen-search">
-    <div class="topbar"><span class="back" onclick="go('home')">→</span><h2>قطع الغيار</h2></div>
-    <div class="searchbar"><span class="icon">🔍</span><input id="search-q" placeholder="ابحث في قطع الغيار" oninput="debouncedSearch()"></div>
+    <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع الغيار</h2></div>
+    <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="search-q" placeholder="ابحث في قطع الغيار" oninput="debouncedSearch()"></div>
     <div class="cat-strip" id="cat-strip"></div>
-    <div id="search-header" style="display:flex; justify-content:space-between; margin-bottom:10px;">
-      <span style="font-size:13px; font-weight:600;">إعلانات: <span id="cat-name">الكل</span></span>
+    <div id="search-header" style="display:flex; justify-content:space-between; margin-bottom:12px;">
+      <span style="font-size:var(--fs-sm); font-weight:700;">إعلانات: <span id="cat-name">الكل</span></span>
       <span class="muted" id="cat-count">— </span>
     </div>
     <div class="listing-grid" id="search-listings"></div>
@@ -216,13 +235,13 @@
 
   <!-- ================= LISTING DETAIL ================= -->
   <div class="screen" id="screen-detail">
-    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>تفاصيل الإعلان</h2></div>
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>تفاصيل الإعلان</h2></div>
     <div class="card" id="detail-body"></div>
   </div>
 
   <!-- ================= CREATE LISTING ================= -->
   <div class="screen" id="screen-create">
-    <div class="topbar"><span class="back" onclick="go('home')">→</span><h2>إضافة إعلان قطعة غيار</h2></div>
+    <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>إضافة إعلان قطعة غيار</h2></div>
     <div class="card">
       <label>عنوان الإعلان</label>
       <input id="cl-title" placeholder="مثال: زجاج أمامي مرسيدس C200 موديل 2019">
@@ -230,7 +249,7 @@
       <label>فئة القطعة</label>
       <select id="cl-part-category"></select>
 
-      <label>📍 المدينة</label>
+      <label style="display:flex; align-items:center; gap:5px;"><i data-lucide="map-pin" class="icon icon-xs"></i> المدينة</label>
       <select id="cl-city"></select>
 
       <label>مطابقة (اختياري)</label>
@@ -245,7 +264,9 @@
 
       <label>الصور</label>
       <div class="upload-drop" onclick="document.getElementById('cl-images').click()">
-        📷 اضغط لإضافة صور (حتى 10 صور، 5 ميجا لكل صورة)
+        <i data-lucide="camera" class="icon"></i>
+        اضغط لإضافة صور
+        <small>حتى 10 صور، 5 ميجا لكل صورة</small>
       </div>
       <input id="cl-images" type="file" accept="image/jpeg,image/png" multiple style="display:none" onchange="onImagesSelected(event)">
       <div class="thumb-strip" id="cl-thumbs"></div>
@@ -263,42 +284,42 @@
 
   <!-- ================= SELLER PROFILE ================= -->
   <div class="screen" id="screen-seller">
-    <div class="topbar"><span class="back" onclick="goBack()">→</span><h2>بروفايل البائع</h2></div>
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>بروفايل البائع</h2></div>
     <div class="card" id="seller-body"></div>
-    <h3 style="font-size:14px; margin-bottom:10px;">إعلانات البائع</h3>
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إعلانات البائع</h3>
     <div class="listing-grid" id="seller-listings"></div>
   </div>
 
   <!-- ================= PROFILE / SETTINGS ================= -->
   <div class="screen" id="screen-profile">
     <div class="card" id="profile-body">
-      <div style="display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:6px;">
+      <div style="display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:4px;">
         <div class="avatar" id="profile-avatar"></div>
-        <div><p style="font-size:14px; font-weight:600;" id="profile-name"></p><p class="muted" id="profile-email"></p></div>
+        <div><p style="font-size:var(--fs-base); font-weight:700;" id="profile-name"></p><p class="muted" id="profile-email"></p></div>
       </div>
-      <div class="settings-row" onclick="toast('قريباً')"><span class="icon">👤</span><span>تعديل بيانات الحساب</span><span class="chev">‹</span></div>
-      <div class="settings-row" onclick="toggleNotifRow()"><span class="icon">🔔</span><span>الإشعارات: <b id="notif-state">—</b></span><span class="chev">‹</span></div>
-      <div class="settings-row" onclick="go('forgot')"><span class="icon">🔒</span><span>تغيير كلمة المرور</span><span class="chev">‹</span></div>
-      <div class="settings-row" onclick="go('support')"><span class="icon">🎧</span><span>الدعم الفني</span><span class="chev">‹</span></div>
-      <div class="settings-row" onclick="go('terms-view')"><span class="icon">📄</span><span>الشروط والأحكام</span><span class="chev">‹</span></div>
-      <div class="settings-row" id="admin-row" style="display:none;" onclick="go('admin')"><span class="icon">🛠️</span><span>لوحة التحكم (مسؤول)</span><span class="chev">‹</span></div>
-      <div class="settings-row" style="border:none; color:var(--danger);" onclick="logout()"><span class="icon">🚪</span><span style="color:var(--danger);">تسجيل الخروج</span></div>
+      <div class="settings-row" onclick="toast('قريباً')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="toggleNotifRow()"><i data-lucide="bell" class="icon"></i><span>الإشعارات: <b id="notif-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('support')"><i data-lucide="headphones" class="icon"></i><span>الدعم الفني</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('terms-view')"><i data-lucide="file-text" class="icon"></i><span>الشروط والأحكام</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" id="admin-row" style="display:none;" onclick="go('admin')"><i data-lucide="settings" class="icon"></i><span>لوحة التحكم (مسؤول)</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" style="border:none; color:var(--danger);" onclick="logout()"><i data-lucide="log-out" class="icon" style="color:var(--danger);"></i><span style="color:var(--danger);">تسجيل الخروج</span></div>
     </div>
   </div>
 
   <!-- ================= SUPPORT ================= -->
   <div class="screen" id="screen-support">
-    <div class="topbar"><span class="back" onclick="go('profile')">→</span><h2>الدعم الفني</h2></div>
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الدعم الفني</h2></div>
     <div class="card center">
-      <div class="logo-icon" style="background:var(--blue-light); color:var(--blue);">🎧</div>
-      <p class="muted" style="margin-bottom:20px;">عندك مشكلة أو استفسار؟ فريق الدعم جاهز يساعدك</p>
-      <div style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:10px; text-align:right;">
-        <span style="font-size:20px;">💬</span>
-        <div><p class="muted" style="font-size:11px;">واتساب</p><p style="font-weight:600; font-size:13px;">966XXXXXXXXX+</p></div>
+      <div class="logo-icon" style="background:var(--blue-light); box-shadow:none; color:var(--blue);"><i data-lucide="headphones" class="icon icon-lg"></i></div>
+      <p class="muted" style="margin-bottom:22px;">عندك مشكلة أو استفسار؟ فريق الدعم جاهز يساعدك</p>
+      <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
+        <i data-lucide="message-circle" class="icon icon-lg" style="color:var(--blue);"></i>
+        <div><p class="muted" style="font-size:var(--fs-xs);">واتساب</p><p style="font-weight:700; font-size:var(--fs-base);">966XXXXXXXXX+</p></div>
       </div>
-      <div style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:8px; padding:14px; margin-bottom:16px; text-align:right;">
-        <span style="font-size:20px;">✉️</span>
-        <div><p class="muted" style="font-size:11px;">البريد الإلكتروني</p><p style="font-weight:600; font-size:13px;">support@souqscrap.com</p></div>
+      <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:18px; text-align:right;">
+        <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
+        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني</p><p style="font-weight:700; font-size:var(--fs-base);">support@souqscrap.com</p></div>
       </div>
       <p class="muted">أوقات الرد: يومياً 9ص - 9م</p>
     </div>
@@ -306,23 +327,24 @@
 
   <!-- ================= ADMIN ================= -->
   <div class="screen" id="screen-admin">
-    <div class="topbar"><span class="back" onclick="go('profile')">→</span><h2>لوحة التحكم</h2></div>
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>لوحة التحكم</h2></div>
     <div class="card" id="admin-stats"></div>
     <div class="card" id="admin-users"></div>
   </div>
 
   <!-- ================= NAVBAR ================= -->
   <div class="navbar" id="navbar" style="display:none;">
-    <div class="nav-item" data-nav="home" onclick="go('home')">🏠<span>الرئيسية</span></div>
-    <div class="nav-item" data-nav="search" onclick="go('search')">🔍<span>البحث</span></div>
-    <div class="fab" onclick="requireAuthThen('create')">+</div>
-    <div class="nav-item" onclick="toast('الرسائل تتوفر في مرحلة لاحقة — استخدم زر تواصل مع البائع')">💬<span>الرسائل</span></div>
-    <div class="nav-item" data-nav="profile" onclick="requireAuthThen('profile')">👤<span>حسابي</span></div>
+    <div class="nav-item" data-nav="home" onclick="go('home')"><i data-lucide="home" class="icon"></i><span>الرئيسية</span></div>
+    <div class="nav-item" data-nav="search" onclick="go('search')"><i data-lucide="search" class="icon"></i><span>البحث</span></div>
+    <div class="fab" onclick="requireAuthThen('create')"><i data-lucide="plus" class="icon"></i></div>
+    <div class="nav-item" onclick="toast('الرسائل تتوفر في مرحلة لاحقة — استخدم زر تواصل مع البائع')"><i data-lucide="message-circle" class="icon"></i><span>الرسائل</span></div>
+    <div class="nav-item" data-nav="profile" onclick="requireAuthThen('profile')"><i data-lucide="user" class="icon"></i><span>حسابي</span></div>
   </div>
 
   <div class="toast" id="toast"></div>
 </div>
 
+<script src="vendor/lucide.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
