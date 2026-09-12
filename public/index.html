@@ -207,9 +207,9 @@
     </div>
     <div class="cat-grid">
       <div class="cat-card selected" onclick="go('search')"><i data-lucide="wrench" class="icon"></i>قطع غيار</div>
-      <div class="cat-card disabled" onclick="toast('قريباً — سيارات كاملة (مرحلة لاحقة)')"><i data-lucide="car" class="icon"></i>سيارات كاملة</div>
-      <div class="cat-card disabled" onclick="toast('قريباً — شاحنات وتريلات (مرحلة لاحقة)')"><i data-lucide="truck" class="icon"></i>شاحنات وتريلات</div>
-      <div class="cat-card" onclick="go('moto-makes')"><i data-lucide="bike" class="icon"></i>دراجات نارية</div>
+      <div class="cat-card" onclick="openVehicleSection('full_car')"><i data-lucide="car" class="icon"></i>سيارات كاملة</div>
+      <div class="cat-card" onclick="openVehicleSection('truck')"><i data-lucide="truck" class="icon"></i>شاحنات وتريلات</div>
+      <div class="cat-card" onclick="openVehicleSection('motorcycle')"><i data-lucide="bike" class="icon"></i>دراجات نارية</div>
     </div>
     <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">أحدث الإعلانات</h3>
     <div class="listing-grid" id="home-listings"></div>
@@ -228,59 +228,62 @@
     <div class="listing-grid" id="search-listings"></div>
   </div>
 
-  <!-- ================= MOTORCYCLES: MAKE SELECTION ================= -->
-  <div class="screen" id="screen-moto-makes">
-    <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الدراجات النارية</h2></div>
+  <!-- ================= VEHICLE SECTIONS: MAKE SELECTION ================= -->
+  <!-- shared by the three "vehicle sections" (vehicleCategory in app.js): motorcycle / full_car / truck -->
+  <div class="screen" id="screen-vehicle-makes">
+    <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="vehicle-makes-title">الدراجات النارية</h2></div>
     <p class="muted" style="margin-bottom:14px;">اختر الشركة المصنّعة</p>
-    <div class="cat-grid" id="moto-makes-grid"></div>
-    <div class="card" id="moto-other-make-box" style="display:none;">
+    <div class="cat-grid" id="vehicle-makes-grid"></div>
+    <div class="card" id="vehicle-other-make-box" style="display:none;">
       <label>اكتب اسم الشركة المصنّعة</label>
-      <input id="moto-other-make-input" placeholder="مثال: Lifan">
-      <button class="btn-primary" onclick="confirmMotoOtherMake()">متابعة</button>
+      <input id="vehicle-other-make-input" placeholder="مثال: Lifan">
+      <button class="btn-primary" onclick="confirmVehicleOtherMake()">متابعة</button>
     </div>
   </div>
 
-  <!-- ================= MOTORCYCLES: PARTS VS WHOLE CHOICE ================= -->
-  <div class="screen" id="screen-moto-choice">
-    <div class="topbar"><span class="back" onclick="go('moto-makes')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="moto-choice-title">دراجات</h2></div>
-    <div class="card" onclick="openMotoParts()" style="cursor:pointer; margin-bottom:12px; display:flex; align-items:center; gap:14px;">
+  <!-- ================= VEHICLE SECTIONS: PARTS VS WHOLE CHOICE ================= -->
+  <div class="screen" id="screen-vehicle-choice">
+    <div class="topbar"><span class="back" onclick="go('vehicle-makes')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="vehicle-choice-title">دراجات</h2></div>
+    <div class="card" onclick="openVehicleParts()" style="cursor:pointer; margin-bottom:12px; display:flex; align-items:center; gap:14px;">
       <div class="logo-icon" style="width:52px; height:52px; margin:0; box-shadow:none; background:var(--blue-light); color:var(--blue);"><i data-lucide="wrench" class="icon"></i></div>
       <div style="flex:1;">
-        <p style="font-weight:700; font-size:var(--fs-base); margin-bottom:2px;">قطع غيار <span id="moto-choice-make-1"></span></p>
+        <p style="font-weight:700; font-size:var(--fs-base); margin-bottom:2px;">قطع غيار <span id="vehicle-choice-make-1"></span></p>
         <p class="muted">تصفّح قطع الغيار المتوفرة لهذه الشركة</p>
       </div>
       <i data-lucide="chevron-left" class="icon icon-muted"></i>
     </div>
-    <div class="card" onclick="openMotoWhole()" style="cursor:pointer; display:flex; align-items:center; gap:14px;">
-      <div class="logo-icon" style="width:52px; height:52px; margin:0; box-shadow:none; background:var(--blue-light); color:var(--blue);"><i data-lucide="bike" class="icon"></i></div>
+    <div class="card" onclick="openVehicleWhole()" style="cursor:pointer; display:flex; align-items:center; gap:14px;">
+      <div class="logo-icon" style="width:52px; height:52px; margin:0; box-shadow:none; background:var(--blue-light); color:var(--blue);" id="vehicle-choice-whole-icon"></div>
       <div style="flex:1;">
-        <p style="font-weight:700; font-size:var(--fs-base); margin-bottom:2px;">دراجات <span id="moto-choice-make-2"></span> كاملة تالفة</p>
-        <p class="muted">تصفّح دراجات تالفة للبيع لإصلاحها بنفسك</p>
+        <p style="font-weight:700; font-size:var(--fs-base); margin-bottom:2px;" id="vehicle-choice-whole-label">دراجات <span id="vehicle-choice-make-2"></span> كاملة تالفة</p>
+        <p class="muted">تصفّح مركبات تالفة للبيع لإصلاحها بنفسك</p>
       </div>
       <i data-lucide="chevron-left" class="icon icon-muted"></i>
     </div>
   </div>
 
-  <!-- ================= MOTORCYCLES: PARTS BROWSE ================= -->
-  <div class="screen" id="screen-moto-parts">
-    <div class="topbar"><span class="back" onclick="go('moto-choice')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع غيار <span id="moto-parts-make"></span></h2></div>
-    <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="moto-parts-q" placeholder="ابحث في القطع" oninput="debouncedMotoPartsSearch()"></div>
-    <div class="cat-strip" id="moto-parts-cat-strip"></div>
+  <!-- ================= VEHICLE SECTIONS: PARTS BROWSE ================= -->
+  <div class="screen" id="screen-vehicle-parts">
+    <div class="topbar"><span class="back" onclick="go('vehicle-choice')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع غيار <span id="vehicle-parts-make"></span></h2></div>
+    <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="vehicle-parts-q" placeholder="ابحث في القطع" oninput="debouncedVehiclePartsSearch()"></div>
+    <select id="vehicle-parts-model-filter" onchange="renderVehicleParts()" style="margin-bottom:12px;"></select>
+    <div class="cat-strip" id="vehicle-parts-cat-strip"></div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <span class="muted" id="moto-parts-count">— </span>
-      <span class="link" style="font-size:var(--fs-sm);" onclick="openMotoCreatePart()">+ نشر قطعة غيار</span>
+      <span class="muted" id="vehicle-parts-count">— </span>
+      <span class="link" style="font-size:var(--fs-sm);" onclick="openVehicleCreatePart()">+ نشر قطعة غيار</span>
     </div>
-    <div class="listing-grid" id="moto-parts-listings"></div>
+    <div class="listing-grid" id="vehicle-parts-listings"></div>
   </div>
 
-  <!-- ================= MOTORCYCLES: WHOLE BIKES BROWSE ================= -->
-  <div class="screen" id="screen-moto-whole">
-    <div class="topbar"><span class="back" onclick="go('moto-choice')"><i data-lucide="chevron-right" class="icon"></i></span><h2>دراجات <span id="moto-whole-make"></span> تالفة</h2></div>
+  <!-- ================= VEHICLE SECTIONS: WHOLE VEHICLE BROWSE ================= -->
+  <div class="screen" id="screen-vehicle-whole">
+    <div class="topbar"><span class="back" onclick="go('vehicle-choice')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="vehicle-whole-heading">دراجات <span id="vehicle-whole-make"></span> تالفة</h2></div>
+    <select id="vehicle-whole-model-filter" onchange="renderVehicleWhole()" style="margin-bottom:12px;"></select>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <span class="muted" id="moto-whole-count">— </span>
-      <span class="link" style="font-size:var(--fs-sm);" onclick="openMotoCreateWhole()">+ نشر دراجة للبيع</span>
+      <span class="muted" id="vehicle-whole-count">— </span>
+      <span class="link" style="font-size:var(--fs-sm);" id="vehicle-whole-create-link" onclick="openVehicleCreateWhole()">+ نشر للبيع</span>
     </div>
-    <div class="listing-grid" id="moto-whole-listings"></div>
+    <div class="listing-grid" id="vehicle-whole-listings"></div>
   </div>
 
   <!-- ================= LISTING DETAIL ================= -->
@@ -290,7 +293,7 @@
   </div>
 
   <!-- ================= CREATE LISTING ================= -->
-  <!-- reused for 3 modes (createMode in app.js): car_part (default), moto_part, moto_whole -->
+  <!-- reused for 3 modes (createMode in app.js): car_part (default), vehicle_part, vehicle_whole -->
   <div class="screen" id="screen-create">
     <div class="topbar"><span class="back" id="cl-back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="cl-heading">إضافة إعلان قطعة غيار</h2></div>
     <div class="card">
@@ -320,32 +323,35 @@
         </div>
       </div>
 
-      <div id="cl-block-moto-part-compat" style="display:none;">
+      <div id="cl-block-vehicle-part-compat" style="display:none;">
         <label>الشركة المصنّعة</label>
-        <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); margin-bottom:14px;" id="cl-moto-part-make-display"></div>
-        <label>مطابقة (اختياري)</label>
+        <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); margin-bottom:14px;" id="cl-vehicle-part-make-display"></div>
+        <label>الموديل (اختياري)</label>
+        <select id="cl-vehicle-part-model" onchange="onVehicleModelChange('part')"></select>
+        <input id="cl-vehicle-part-model-other" placeholder="اكتب اسم الموديل" style="display:none;">
+        <label>مطابقة سنة (اختياري)</label>
         <div class="row2">
-          <div><input id="cl-moto-part-model" placeholder="الموديل"></div>
-        </div>
-        <div class="row2">
-          <div><input id="cl-moto-part-year-from" type="number" placeholder="من سنة"></div>
-          <div><input id="cl-moto-part-year-to" type="number" placeholder="إلى سنة"></div>
+          <div><input id="cl-vehicle-part-year-from" type="number" placeholder="من سنة"></div>
+          <div><input id="cl-vehicle-part-year-to" type="number" placeholder="إلى سنة"></div>
         </div>
       </div>
 
-      <div id="cl-block-moto-whole" style="display:none;">
+      <div id="cl-block-vehicle-whole" style="display:none;">
         <label>الشركة المصنّعة</label>
-        <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); margin-bottom:14px;" id="cl-moto-whole-make-display"></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); margin-bottom:14px;" id="cl-vehicle-whole-make-display"></div>
+        <label>الموديل</label>
+        <select id="cl-vehicle-whole-model" onchange="onVehicleModelChange('whole')"></select>
+        <input id="cl-vehicle-whole-model-other" placeholder="اكتب اسم الموديل" style="display:none;">
         <div class="row2">
-          <div><label>الموديل</label><input id="cl-moto-whole-model" placeholder="مثال: Ninja 300"></div>
-          <div><label>سنة الصنع</label><input id="cl-moto-whole-year" type="number" placeholder="2020"></div>
+          <div><label>سنة الصنع</label><input id="cl-vehicle-whole-year" type="number" placeholder="2020"></div>
+          <div><label>درجة التلف</label>
+            <select id="cl-vehicle-whole-damage">
+              <option value="light">خفيف</option>
+              <option value="medium">متوسط</option>
+              <option value="severe">شديد</option>
+            </select>
+          </div>
         </div>
-        <label>درجة التلف</label>
-        <select id="cl-moto-whole-damage">
-          <option value="light">خفيف</option>
-          <option value="medium">متوسط</option>
-          <option value="severe">شديد</option>
-        </select>
       </div>
 
       <label>الصور</label>

@@ -12,7 +12,10 @@ const {
   COUNTRY_CURRENCY,
   COUNTRY_CITIES,
   PART_CATEGORIES,
-  MOTORCYCLE_MAKES,
+  VEHICLE_LABELS,
+  VEHICLE_CATEGORIES,
+  VEHICLE_MAKES,
+  VEHICLE_MODELS_BY_MAKE,
 } = require('../utils/constants');
 
 const router = express.Router();
@@ -20,7 +23,7 @@ const router = express.Router();
 const MAX_IMAGES = 10;
 const MAX_IMAGE_MB = 5;
 const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
-const CATEGORIES = ['spare_part', 'motorcycle'];
+const CATEGORIES = ['spare_part', ...VEHICLE_CATEGORIES];
 const LISTING_TYPES = ['part', 'whole'];
 
 const upload = multer({
@@ -80,11 +83,16 @@ router.get('/meta', (_req, res) => {
     })),
     cities_by_country: COUNTRY_CITIES,
     part_categories: PART_CATEGORIES,
-    motorcycle_makes: MOTORCYCLE_MAKES,
+    vehicle_categories: Object.fromEntries(
+      VEHICLE_CATEGORIES.map((cat) => [
+        cat,
+        { label: VEHICLE_LABELS[cat], makes: VEHICLE_MAKES[cat], models_by_make: VEHICLE_MODELS_BY_MAKE[cat] },
+      ])
+    ),
   });
 });
 
-// GET /api/listings?category=&listing_type=&make=&q=&part_category=&city=&country=
+// GET /api/listings?category=&listing_type=&make=&model=&q=&part_category=&city=&country=
 // category defaults to 'spare_part' (the original car-parts browse/search screens
 // never sent a category param, so this keeps them working unchanged). country is
 // left unfiltered when omitted — cross-border search across the GCC is the point
@@ -92,7 +100,7 @@ router.get('/meta', (_req, res) => {
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { q, part_category, city, category, listing_type, make, country } = req.query;
+    const { q, part_category, city, category, listing_type, make, model, country } = req.query;
     const effectiveCategory = category || 'spare_part';
     const clauses = ["status = 'active'", `category = $1`];
     const params = [effectiveCategory];
@@ -108,6 +116,10 @@ router.get(
     if (make) {
       params.push(make);
       clauses.push(`compatible_make = $${params.length}`);
+    }
+    if (model) {
+      params.push(model);
+      clauses.push(`compatible_model = $${params.length}`);
     }
     if (q) {
       params.push(`%${q}%`);
@@ -242,17 +254,17 @@ router.post(
     let finalPartCategory = part_category || null;
     let finalDamageSeverity = null;
 
-    if (effectiveCategory === 'motorcycle') {
+    if (VEHICLE_CATEGORIES.includes(effectiveCategory)) {
       if (!LISTING_TYPES.includes(listing_type)) {
-        return res.status(400).json({ error: 'نوع الإعلان (قطعة / دراجة كاملة) مطلوب' });
+        return res.status(400).json({ error: 'نوع الإعلان (قطعة / مركبة كاملة) مطلوب' });
       }
       effectiveListingType = listing_type;
 
-      // The manufacturer grid (MOTORCYCLE_MAKES) is a selection convenience on
-      // the client; 'أخرى' there prompts the user for a custom name before
-      // ever calling this endpoint, so by the time a listing is created
-      // compatible_make is just a normal free-text manufacturer name — same
-      // as it already is for car parts.
+      // The manufacturer (and model) grids are a selection convenience on the
+      // client; 'أخرى' there prompts the user for a custom name before ever
+      // calling this endpoint, so by the time a listing is created
+      // compatible_make/compatible_model are just normal free-text values —
+      // same as they already are for car parts (spare_part).
       if (!compatible_make || !compatible_make.trim()) {
         return res.status(400).json({ error: 'الشركة المصنّعة مطلوبة' });
       }
@@ -263,10 +275,10 @@ router.post(
           return res.status(400).json({ error: 'فئة القطعة مطلوبة' });
         }
       } else {
-        // whole motorcycle for sale: compatible_model/compatible_year_from
-        // store the bike's own model/year (not a "compatible with" reference).
+        // whole vehicle for sale: compatible_model/compatible_year_from store
+        // the vehicle's own model/year (not a "compatible with" reference).
         if (!compatible_model || !compatible_year_from) {
-          return res.status(400).json({ error: 'موديل الدراجة وسنة الصنع مطلوبة' });
+          return res.status(400).json({ error: 'الموديل وسنة الصنع مطلوبة' });
         }
         if (!damage_severity || !DAMAGE_LEVELS.includes(damage_severity)) {
           return res.status(400).json({ error: 'درجة التلف مطلوبة' });

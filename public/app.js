@@ -6,7 +6,7 @@ let chosenOtpMethod = 'whatsapp';
 let chosenFpMethod = 'whatsapp';
 let fpUserId = null;
 let currentUser = null;
-let meta = { countries: [], cities_by_country: {}, part_categories: [], motorcycle_makes: [] };
+let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {} };
 const COUNTRY_KEY = 'alscrap_country';
 let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
@@ -14,11 +14,19 @@ let searchDebounceTimer = null;
 let currentListingId = null;
 let selectedImages = []; // File[] for create-listing
 
-let motoContext = { make: null };
-let selectedMotoPartCategory = '';
-let motoPartsDebounceTimer = null;
-let createMode = 'car_part'; // 'car_part' | 'moto_part' | 'moto_whole' — which shape screen-create renders
-let createMotoMake = null;
+// "Vehicle sections" — motorcycles / full cars / trucks, all sharing the
+// same screens (screen-vehicle-makes/choice/parts/whole), driven by
+// vehicleCategory. Unrelated to the plain, manufacturer-optional "قطع غيار"
+// (spare_part) flow, which stays exactly as it was.
+let vehicleCategory = null; // 'motorcycle' | 'full_car' | 'truck'
+let vehicleContext = { make: null };
+let selectedVehiclePartCategory = '';
+let vehiclePartsDebounceTimer = null;
+let selectedVehiclePartsModel = '';
+let selectedVehicleWholeModel = '';
+let createMode = 'car_part'; // 'car_part' | 'vehicle_part' | 'vehicle_whole' — which shape screen-create renders
+let createVehicleCategory = null;
+let createVehicleMake = null;
 
 const TOKEN_KEY = 'alscrap_token';
 
@@ -64,9 +72,9 @@ function go(id) {
   if (id === 'profile') renderProfile();
   if (id === 'admin') renderAdmin();
   if (id === 'my-listings') renderMyListings();
-  if (id === 'moto-makes') renderMotoMakes();
-  if (id === 'moto-parts') renderMotoParts();
-  if (id === 'moto-whole') renderMotoWhole();
+  if (id === 'vehicle-makes') renderVehicleMakes();
+  if (id === 'vehicle-parts') renderVehicleParts();
+  if (id === 'vehicle-whole') renderVehicleWhole();
   window.scrollTo(0, 0);
 }
 function goBack() {
@@ -118,7 +126,7 @@ async function bootstrap() {
   try {
     meta = await api('/listings/meta');
   } catch {
-    meta = { countries: [], cities_by_country: {}, part_categories: [], motorcycle_makes: [] };
+    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {} };
   }
   populateMetaSelects();
 
@@ -464,103 +472,140 @@ async function renderSearch() {
   }
 }
 
-// ---------- motorcycles ----------
-function renderMotoMakes() {
-  const grid = document.getElementById('moto-makes-grid');
-  grid.innerHTML = meta.motorcycle_makes
-    .map((m) => `<div class="cat-card" onclick="selectMotoMake('${escapeHtml(m)}')">${icon('bike')}${escapeHtml(m)}</div>`)
+// ---------- vehicle sections (motorcycles / full cars / trucks) ----------
+const VEHICLE_ICONS = { motorcycle: 'bike', full_car: 'car', truck: 'truck' };
+const VEHICLE_PLURALS = { motorcycle: 'دراجات', full_car: 'سيارات', truck: 'شاحنات' };
+const VEHICLE_SECTION_TITLES = { motorcycle: 'الدراجات النارية', full_car: 'السيارات الكاملة', truck: 'الشاحنات والتريلات' };
+
+function currentVehicleMeta() {
+  return (meta.vehicle_categories && meta.vehicle_categories[vehicleCategory]) || { label: '', makes: [], models_by_make: {} };
+}
+function openVehicleSection(category) {
+  vehicleCategory = category;
+  vehicleContext = { make: null };
+  go('vehicle-makes');
+}
+function renderVehicleMakes() {
+  document.getElementById('vehicle-makes-title').textContent = VEHICLE_SECTION_TITLES[vehicleCategory];
+  const grid = document.getElementById('vehicle-makes-grid');
+  grid.innerHTML = currentVehicleMeta().makes
+    .map((m) => `<div class="cat-card" onclick="selectVehicleMake('${escapeHtml(m)}')">${icon(VEHICLE_ICONS[vehicleCategory])}${escapeHtml(m)}</div>`)
     .join('');
   refreshIcons();
-  document.getElementById('moto-other-make-box').style.display = 'none';
+  document.getElementById('vehicle-other-make-box').style.display = 'none';
 }
-function selectMotoMake(make) {
+function selectVehicleMake(make) {
   if (make === 'أخرى') {
-    const box = document.getElementById('moto-other-make-box');
+    const box = document.getElementById('vehicle-other-make-box');
     box.style.display = 'block';
-    document.getElementById('moto-other-make-input').value = '';
-    document.getElementById('moto-other-make-input').focus();
+    document.getElementById('vehicle-other-make-input').value = '';
+    document.getElementById('vehicle-other-make-input').focus();
     return;
   }
-  proceedWithMotoMake(make);
+  proceedWithVehicleMake(make);
 }
-function confirmMotoOtherMake() {
-  const name = document.getElementById('moto-other-make-input').value.trim();
+function confirmVehicleOtherMake() {
+  const name = document.getElementById('vehicle-other-make-input').value.trim();
   if (!name) return toast('اكتب اسم الشركة المصنّعة');
-  proceedWithMotoMake(name);
+  proceedWithVehicleMake(name);
 }
-function proceedWithMotoMake(make) {
-  motoContext.make = make;
-  document.getElementById('moto-choice-title').textContent = 'دراجات ' + make;
-  document.getElementById('moto-choice-make-1').textContent = make;
-  document.getElementById('moto-choice-make-2').textContent = make;
-  go('moto-choice');
+function proceedWithVehicleMake(make) {
+  vehicleContext.make = make;
+  const plural = VEHICLE_PLURALS[vehicleCategory];
+  document.getElementById('vehicle-choice-title').textContent = plural + ' ' + make;
+  document.getElementById('vehicle-choice-make-1').textContent = make;
+  document.getElementById('vehicle-choice-whole-icon').innerHTML = icon(VEHICLE_ICONS[vehicleCategory]);
+  document.getElementById('vehicle-choice-whole-label').innerHTML =
+    `${plural} <span id="vehicle-choice-make-2">${escapeHtml(make)}</span> كاملة تالفة`;
+  refreshIcons();
+  go('vehicle-choice');
 }
-function openMotoParts() {
-  document.getElementById('moto-parts-make').textContent = motoContext.make;
-  selectedMotoPartCategory = '';
-  document.getElementById('moto-parts-q').value = '';
-  go('moto-parts');
+function openVehicleParts() {
+  document.getElementById('vehicle-parts-make').textContent = vehicleContext.make;
+  selectedVehiclePartCategory = '';
+  selectedVehiclePartsModel = '';
+  document.getElementById('vehicle-parts-q').value = '';
+  go('vehicle-parts');
 }
-function openMotoWhole() {
-  document.getElementById('moto-whole-make').textContent = motoContext.make;
-  go('moto-whole');
+function openVehicleWhole() {
+  const plural = VEHICLE_PLURALS[vehicleCategory];
+  document.getElementById('vehicle-whole-heading').innerHTML =
+    `${plural} <span id="vehicle-whole-make">${escapeHtml(vehicleContext.make)}</span> تالفة`;
+  document.getElementById('vehicle-whole-create-link').textContent = '+ نشر ' + currentVehicleMeta().label + ' للبيع';
+  selectedVehicleWholeModel = '';
+  go('vehicle-whole');
 }
-function renderMotoPartsCatStrip() {
-  const strip = document.getElementById('moto-parts-cat-strip');
-  const all = `<div class="cat-chip ${selectedMotoPartCategory === '' ? 'selected' : ''}" onclick="selectMotoPartCategory('')">الكل</div>`;
+function populateModelFilter(selectId, selectedValue) {
+  const models = (currentVehicleMeta().models_by_make[vehicleContext.make] || []).filter((m) => m !== 'أخرى');
+  document.getElementById(selectId).innerHTML =
+    '<option value="">كل الموديلات</option>' +
+    models.map((m) => `<option value="${escapeHtml(m)}" ${m === selectedValue ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+}
+function renderVehiclePartsCatStrip() {
+  const strip = document.getElementById('vehicle-parts-cat-strip');
+  const all = `<div class="cat-chip ${selectedVehiclePartCategory === '' ? 'selected' : ''}" onclick="selectVehiclePartCategory('')">الكل</div>`;
   strip.innerHTML = all + meta.part_categories
-    .map((c) => `<div class="cat-chip ${c === selectedMotoPartCategory ? 'selected' : ''}" onclick="selectMotoPartCategory('${escapeHtml(c)}')">${escapeHtml(c)}</div>`)
+    .map((c) => `<div class="cat-chip ${c === selectedVehiclePartCategory ? 'selected' : ''}" onclick="selectVehiclePartCategory('${escapeHtml(c)}')">${escapeHtml(c)}</div>`)
     .join('');
 }
-function selectMotoPartCategory(c) {
-  selectedMotoPartCategory = c;
-  renderMotoParts();
+function selectVehiclePartCategory(c) {
+  selectedVehiclePartCategory = c;
+  renderVehicleParts();
 }
-function debouncedMotoPartsSearch() {
-  clearTimeout(motoPartsDebounceTimer);
-  motoPartsDebounceTimer = setTimeout(renderMotoParts, 300);
+function debouncedVehiclePartsSearch() {
+  clearTimeout(vehiclePartsDebounceTimer);
+  vehiclePartsDebounceTimer = setTimeout(renderVehicleParts, 300);
 }
-async function renderMotoParts() {
-  renderMotoPartsCatStrip();
-  const q = document.getElementById('moto-parts-q').value.trim();
-  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'part', make: motoContext.make, country: browsingCountry });
+async function renderVehicleParts() {
+  renderVehiclePartsCatStrip();
+  selectedVehiclePartsModel = document.getElementById('vehicle-parts-model-filter').value;
+  populateModelFilter('vehicle-parts-model-filter', selectedVehiclePartsModel);
+  const q = document.getElementById('vehicle-parts-q').value.trim();
+  const params = new URLSearchParams({ category: vehicleCategory, listing_type: 'part', make: vehicleContext.make, country: browsingCountry });
   if (q) params.set('q', q);
-  if (selectedMotoPartCategory) params.set('part_category', selectedMotoPartCategory);
+  if (selectedVehiclePartCategory) params.set('part_category', selectedVehiclePartCategory);
+  if (selectedVehiclePartsModel) params.set('model', selectedVehiclePartsModel);
 
-  const el = document.getElementById('moto-parts-listings');
+  const el = document.getElementById('vehicle-parts-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listings } = await api('/listings?' + params.toString());
-    document.getElementById('moto-parts-count').textContent = listings.length + ' نتيجة';
+    document.getElementById('vehicle-parts-count').textContent = listings.length + ' نتيجة';
     el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد قطع بعد</p>';
     refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر تحميل القطع</p>';
   }
 }
-async function renderMotoWhole() {
-  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'whole', make: motoContext.make, country: browsingCountry });
-  const el = document.getElementById('moto-whole-listings');
+async function renderVehicleWhole() {
+  selectedVehicleWholeModel = document.getElementById('vehicle-whole-model-filter').value;
+  populateModelFilter('vehicle-whole-model-filter', selectedVehicleWholeModel);
+  const params = new URLSearchParams({ category: vehicleCategory, listing_type: 'whole', make: vehicleContext.make, country: browsingCountry });
+  if (selectedVehicleWholeModel) params.set('model', selectedVehicleWholeModel);
+
+  const el = document.getElementById('vehicle-whole-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listings } = await api('/listings?' + params.toString());
-    document.getElementById('moto-whole-count').textContent = listings.length + ' نتيجة';
-    el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد دراجات معروضة بعد</p>';
+    document.getElementById('vehicle-whole-count').textContent = listings.length + ' نتيجة';
+    el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد مركبات معروضة بعد</p>';
     refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر التحميل</p>';
   }
 }
-function openMotoCreatePart() {
+function openVehicleCreatePart() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
-  createMode = 'moto_part';
-  createMotoMake = motoContext.make;
+  createMode = 'vehicle_part';
+  createVehicleCategory = vehicleCategory;
+  createVehicleMake = vehicleContext.make;
   go('create');
 }
-function openMotoCreateWhole() {
+function openVehicleCreateWhole() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
-  createMode = 'moto_whole';
-  createMotoMake = motoContext.make;
+  createMode = 'vehicle_whole';
+  createVehicleCategory = vehicleCategory;
+  createVehicleMake = vehicleContext.make;
   go('create');
 }
 
@@ -658,12 +703,12 @@ function prepareCreateScreen() {
   document.getElementById('cl-model').value = '';
   document.getElementById('cl-year-from').value = '';
   document.getElementById('cl-year-to').value = '';
-  document.getElementById('cl-moto-part-model').value = '';
-  document.getElementById('cl-moto-part-year-from').value = '';
-  document.getElementById('cl-moto-part-year-to').value = '';
-  document.getElementById('cl-moto-whole-model').value = '';
-  document.getElementById('cl-moto-whole-year').value = '';
-  document.getElementById('cl-moto-whole-damage').value = 'light';
+  document.getElementById('cl-vehicle-part-year-from').value = '';
+  document.getElementById('cl-vehicle-part-year-to').value = '';
+  document.getElementById('cl-vehicle-part-model-other').value = '';
+  document.getElementById('cl-vehicle-whole-year').value = '';
+  document.getElementById('cl-vehicle-whole-damage').value = 'light';
+  document.getElementById('cl-vehicle-whole-model-other').value = '';
   document.getElementById('cl-country').value = browsingCountry;
   onCreateCountryChange();
   selectedImages = [];
@@ -672,25 +717,50 @@ function prepareCreateScreen() {
 
   const heading = document.getElementById('cl-heading');
   const backBtn = document.getElementById('cl-back');
-  document.getElementById('cl-block-part-category').style.display = createMode === 'moto_whole' ? 'none' : 'block';
+  document.getElementById('cl-block-part-category').style.display = createMode === 'vehicle_whole' ? 'none' : 'block';
   document.getElementById('cl-block-car-compat').style.display = createMode === 'car_part' ? 'block' : 'none';
-  document.getElementById('cl-block-moto-part-compat').style.display = createMode === 'moto_part' ? 'block' : 'none';
-  document.getElementById('cl-block-moto-whole').style.display = createMode === 'moto_whole' ? 'block' : 'none';
+  document.getElementById('cl-block-vehicle-part-compat').style.display = createMode === 'vehicle_part' ? 'block' : 'none';
+  document.getElementById('cl-block-vehicle-whole').style.display = createMode === 'vehicle_whole' ? 'block' : 'none';
 
-  if (createMode === 'moto_part') {
-    heading.textContent = 'إضافة قطعة غيار دراجة';
-    backBtn.onclick = () => go('moto-parts');
-    document.getElementById('cl-moto-part-make-display').innerHTML = icon('bike', 'icon-sm icon-muted') + ' ' + escapeHtml(createMotoMake);
+  if (createMode === 'vehicle_part' || createMode === 'vehicle_whole') {
+    const isWhole = createMode === 'vehicle_whole';
+    const label = (meta.vehicle_categories[createVehicleCategory] || {}).label || '';
+    heading.textContent = isWhole ? `إضافة ${label} تالفة للبيع` : `إضافة قطعة غيار ${label}`;
+    backBtn.onclick = () => go(isWhole ? 'vehicle-whole' : 'vehicle-parts');
+    const makeDisplayId = isWhole ? 'cl-vehicle-whole-make-display' : 'cl-vehicle-part-make-display';
+    document.getElementById(makeDisplayId).innerHTML = icon(VEHICLE_ICONS[createVehicleCategory], 'icon-sm icon-muted') + ' ' + escapeHtml(createVehicleMake);
     refreshIcons();
-  } else if (createMode === 'moto_whole') {
-    heading.textContent = 'إضافة دراجة تالفة للبيع';
-    backBtn.onclick = () => go('moto-whole');
-    document.getElementById('cl-moto-whole-make-display').innerHTML = icon('bike', 'icon-sm icon-muted') + ' ' + escapeHtml(createMotoMake);
-    refreshIcons();
+
+    const models = ((meta.vehicle_categories[createVehicleCategory] || {}).models_by_make || {})[createVehicleMake] || [];
+    const selectId = isWhole ? 'cl-vehicle-whole-model' : 'cl-vehicle-part-model';
+    const select = document.getElementById(selectId);
+    const otherInputId = isWhole ? 'cl-vehicle-whole-model-other' : 'cl-vehicle-part-model-other';
+    if (models.length) {
+      select.style.display = 'block';
+      select.innerHTML = (isWhole ? '' : '<option value="">— بدون تحديد —</option>') +
+        models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+      document.getElementById(otherInputId).style.display = 'none';
+    } else {
+      // custom manufacturer -> no known model list, just a free-text field
+      select.style.display = 'none';
+      select.innerHTML = '';
+      document.getElementById(otherInputId).style.display = 'block';
+    }
   } else {
     heading.textContent = 'إضافة إعلان قطعة غيار';
     backBtn.onclick = () => go('home');
   }
+}
+function onVehicleModelChange(mode) {
+  const select = document.getElementById(mode === 'part' ? 'cl-vehicle-part-model' : 'cl-vehicle-whole-model');
+  const other = document.getElementById(mode === 'part' ? 'cl-vehicle-part-model-other' : 'cl-vehicle-whole-model-other');
+  other.style.display = select.value === 'أخرى' ? 'block' : 'none';
+}
+function getVehicleModelValue(mode) {
+  const select = document.getElementById(mode === 'part' ? 'cl-vehicle-part-model' : 'cl-vehicle-whole-model');
+  const other = document.getElementById(mode === 'part' ? 'cl-vehicle-part-model-other' : 'cl-vehicle-whole-model-other');
+  if (select.style.display === 'none' || select.value === 'أخرى') return other.value.trim();
+  return select.value;
 }
 const MAX_IMAGES = 10;
 const MAX_IMAGE_MB = 5;
@@ -730,30 +800,30 @@ async function publishListing() {
   fd.append('city', city);
   fd.append('description', document.getElementById('cl-desc').value.trim());
 
-  if (createMode === 'moto_part') {
-    const part_category = document.getElementById('cl-part-category').value;
-    if (!title || !price || !city || !part_category) {
-      return showError('cl-error', 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة');
-    }
-    fd.append('category', 'motorcycle');
-    fd.append('listing_type', 'part');
-    fd.append('part_category', part_category);
-    fd.append('compatible_make', createMotoMake);
-    fd.append('compatible_model', document.getElementById('cl-moto-part-model').value.trim());
-    fd.append('compatible_year_from', document.getElementById('cl-moto-part-year-from').value);
-    fd.append('compatible_year_to', document.getElementById('cl-moto-part-year-to').value);
-  } else if (createMode === 'moto_whole') {
-    const model = document.getElementById('cl-moto-whole-model').value.trim();
-    const year = document.getElementById('cl-moto-whole-year').value;
-    if (!title || !price || !city || !model || !year) {
-      return showError('cl-error', 'عنوان الإعلان والسعر والمدينة وموديل الدراجة وسنة الصنع مطلوبة');
-    }
-    fd.append('category', 'motorcycle');
-    fd.append('listing_type', 'whole');
-    fd.append('compatible_make', createMotoMake);
+  if (createMode === 'vehicle_part' || createMode === 'vehicle_whole') {
+    const isWhole = createMode === 'vehicle_whole';
+    const model = getVehicleModelValue(isWhole ? 'whole' : 'part');
+    fd.append('category', createVehicleCategory);
+    fd.append('listing_type', isWhole ? 'whole' : 'part');
+    fd.append('compatible_make', createVehicleMake);
     fd.append('compatible_model', model);
-    fd.append('compatible_year_from', year);
-    fd.append('damage_severity', document.getElementById('cl-moto-whole-damage').value);
+
+    if (isWhole) {
+      const year = document.getElementById('cl-vehicle-whole-year').value;
+      if (!title || !price || !city || !model || !year) {
+        return showError('cl-error', 'عنوان الإعلان والسعر والمدينة والموديل وسنة الصنع مطلوبة');
+      }
+      fd.append('compatible_year_from', year);
+      fd.append('damage_severity', document.getElementById('cl-vehicle-whole-damage').value);
+    } else {
+      const part_category = document.getElementById('cl-part-category').value;
+      if (!title || !price || !city || !part_category) {
+        return showError('cl-error', 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة');
+      }
+      fd.append('part_category', part_category);
+      fd.append('compatible_year_from', document.getElementById('cl-vehicle-part-year-from').value);
+      fd.append('compatible_year_to', document.getElementById('cl-vehicle-part-year-to').value);
+    }
   } else {
     const part_category = document.getElementById('cl-part-category').value;
     if (!title || !price || !city || !part_category) {
@@ -773,8 +843,8 @@ async function publishListing() {
   try {
     await api('/listings', { method: 'POST', body: fd, isForm: true });
     toast('تم نشر الإعلان بنجاح');
-    if (createMode === 'moto_part') go('moto-parts');
-    else if (createMode === 'moto_whole') go('moto-whole');
+    if (createMode === 'vehicle_part') go('vehicle-parts');
+    else if (createMode === 'vehicle_whole') go('vehicle-whole');
     else go('home');
   } catch (err) {
     showError('cl-error', err.message);
