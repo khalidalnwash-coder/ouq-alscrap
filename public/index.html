@@ -42,10 +42,13 @@
         <div class="toggle-opt" id="type-buyer" onclick="selectType('individual')">فرد / مشتري</div>
       </div>
 
+      <label>الدولة</label>
+      <select id="su-country" onchange="onSignupCountryChange()"></select>
+
       <label>رقم الجوال</label>
       <div class="row2">
-        <div style="flex:0 0 100px;">
-          <select id="su-code"><option value="+966">966+</option></select>
+        <div style="flex:0 0 118px;">
+          <select id="su-code"></select>
         </div>
         <div><input id="su-phone" placeholder="5XXXXXXXX"></div>
       </div>
@@ -53,15 +56,8 @@
       <label>البريد الإلكتروني</label>
       <input id="su-email" type="email" placeholder="example@email.com">
 
-      <div class="row2">
-        <div><label>العمر</label><input id="su-age" type="number" placeholder="30"></div>
-        <div>
-          <label>الدولة</label>
-          <div style="display:flex; align-items:center; gap:6px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); color:var(--text-secondary); font-size:var(--fs-base); margin-bottom:14px;">
-            <i data-lucide="map-pin" class="icon icon-sm icon-muted"></i> السعودية
-          </div>
-        </div>
-      </div>
+      <label>العمر</label>
+      <input id="su-age" type="number" placeholder="30">
 
       <label>كلمة المرور</label>
       <input id="su-pass" type="password" placeholder="8 أحرف على الأقل">
@@ -204,9 +200,7 @@
 
   <!-- ================= HOME ================= -->
   <div class="screen" id="screen-home">
-    <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
-      <i data-lucide="map-pin" class="icon icon-xs icon-muted"></i> السعودية · قطع غيار سيارات
-    </p>
+    <select id="home-country" onchange="onBrowsingCountryChange(this.value)" style="margin-bottom:12px;"></select>
     <div class="searchbar">
       <i data-lucide="search" class="icon"></i>
       <input id="home-search" placeholder="ابحث عن قطعة، موديل، أو شركة" onkeydown="if(event.key==='Enter')homeSearch()">
@@ -224,6 +218,7 @@
   <!-- ================= SEARCH / PARTS ================= -->
   <div class="screen" id="screen-search">
     <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع الغيار</h2></div>
+    <select id="search-country" onchange="onBrowsingCountryChange(this.value)" style="margin-bottom:14px;"></select>
     <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="search-q" placeholder="ابحث في قطع الغيار" oninput="debouncedSearch()"></div>
     <div class="cat-strip" id="cat-strip"></div>
     <div id="search-header" style="display:flex; justify-content:space-between; margin-bottom:12px;">
@@ -307,6 +302,9 @@
         <select id="cl-part-category"></select>
       </div>
 
+      <label>الدولة</label>
+      <select id="cl-country" onchange="onCreateCountryChange()"></select>
+
       <label style="display:flex; align-items:center; gap:5px;"><i data-lucide="map-pin" class="icon icon-xs"></i> المدينة</label>
       <select id="cl-city"></select>
 
@@ -362,7 +360,7 @@
       <label>الوصف والمميزات</label>
       <textarea id="cl-desc" placeholder="اكتب وصف حر عن حالة القطعة والمميزات..."></textarea>
 
-      <label>السعر (ريال سعودي)</label>
+      <label id="cl-price-label">السعر</label>
       <input id="cl-price" type="number" placeholder="0">
 
       <p class="error-text" id="cl-error" style="display:none;"></p>

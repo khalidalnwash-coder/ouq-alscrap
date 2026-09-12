@@ -6,7 +6,9 @@ let chosenOtpMethod = 'whatsapp';
 let chosenFpMethod = 'whatsapp';
 let fpUserId = null;
 let currentUser = null;
-let meta = { part_categories: [], cities: [], motorcycle_makes: [] };
+let meta = { countries: [], cities_by_country: {}, part_categories: [], motorcycle_makes: [] };
+const COUNTRY_KEY = 'alscrap_country';
+let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
 let searchDebounceTimer = null;
 let currentListingId = null;
@@ -116,7 +118,7 @@ async function bootstrap() {
   try {
     meta = await api('/listings/meta');
   } catch {
-    meta = { part_categories: [], cities: [], motorcycle_makes: [] };
+    meta = { countries: [], cities_by_country: {}, part_categories: [], motorcycle_makes: [] };
   }
   populateMetaSelects();
 
@@ -131,9 +133,55 @@ async function bootstrap() {
   go('landing');
 }
 
+// ---------- countries ----------
+function countryInfo(code) {
+  return meta.countries.find((c) => c.code === code) || null;
+}
+function countryOptionsHtml(selectedCode) {
+  return meta.countries
+    .map((c) => `<option value="${c.code}" ${c.code === selectedCode ? 'selected' : ''}>${c.flag} ${escapeHtml(c.label)}</option>`)
+    .join('');
+}
+function phoneCodeOptionsHtml(selectedCode) {
+  return meta.countries
+    .map((c) => `<option value="${c.phone_code}" ${c.phone_code === selectedCode ? 'selected' : ''}>${c.flag} ${c.phone_code}</option>`)
+    .join('');
+}
+function setBrowsingCountry(code) {
+  browsingCountry = code;
+  localStorage.setItem(COUNTRY_KEY, code);
+  document.getElementById('home-country').value = code;
+  document.getElementById('search-country').value = code;
+}
+function onBrowsingCountryChange(code) {
+  setBrowsingCountry(code);
+  const activeId = document.querySelector('.screen.active').id;
+  if (activeId === 'screen-home') renderHome();
+  if (activeId === 'screen-search') renderSearch();
+}
+function onSignupCountryChange() {
+  const country = document.getElementById('su-country').value;
+  document.getElementById('su-code').value = countryInfo(country).phone_code;
+}
+function onCreateCountryChange() {
+  const country = document.getElementById('cl-country').value;
+  const cities = meta.cities_by_country[country] || [];
+  document.getElementById('cl-city').innerHTML = cities.map((c) => `<option>${escapeHtml(c)}</option>`).join('');
+  document.getElementById('cl-price-label').textContent = 'السعر (' + (countryInfo(country)?.currency ? CURRENCY_LABELS_AR[countryInfo(country).currency] : '') + ')';
+}
+const CURRENCY_LABELS_AR = {
+  SAR: 'ريال سعودي', AED: 'درهم إماراتي', KWD: 'دينار كويتي',
+  QAR: 'ريال قطري', BHD: 'دينار بحريني', OMR: 'ريال عماني',
+};
+
 function populateMetaSelects() {
-  const cityCreate = document.getElementById('cl-city');
-  cityCreate.innerHTML = meta.cities.map((c) => `<option>${c}</option>`).join('');
+  document.getElementById('su-country').innerHTML = countryOptionsHtml(browsingCountry);
+  document.getElementById('su-code').innerHTML = phoneCodeOptionsHtml(countryInfo(browsingCountry)?.phone_code);
+  document.getElementById('cl-country').innerHTML = countryOptionsHtml(browsingCountry);
+  document.getElementById('home-country').innerHTML = countryOptionsHtml(browsingCountry);
+  document.getElementById('search-country').innerHTML = countryOptionsHtml(browsingCountry);
+  onCreateCountryChange();
+
   const partCat = document.getElementById('cl-part-category');
   partCat.innerHTML = meta.part_categories.map((c) => `<option>${c}</option>`).join('');
 }
@@ -151,6 +199,7 @@ function checkSignupValid() {
 function submitSignup() {
   hideError('su-error');
   const full_name = document.getElementById('su-name').value.trim();
+  const country = document.getElementById('su-country').value;
   const phone_country_code = document.getElementById('su-code').value;
   const phone_number = document.getElementById('su-phone').value.trim();
   const email = document.getElementById('su-email').value.trim();
@@ -164,7 +213,7 @@ function submitSignup() {
   if (password.length < 8) {
     return showError('su-error', 'كلمة المرور يجب أن تكون 8 أحرف على الأقل');
   }
-  signupData = { full_name, account_type: accountType, phone_country_code, phone_number, email, age, password, pledge_accepted };
+  signupData = { full_name, account_type: accountType, country, phone_country_code, phone_number, email, age, password, pledge_accepted };
   go('otp-choice');
 }
 function selectOtpMethod(method) {
@@ -357,10 +406,11 @@ function escapeHtml(s) {
 
 // ---------- home ----------
 async function renderHome() {
+  document.getElementById('home-country').value = browsingCountry;
   const el = document.getElementById('home-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
-    const { listings } = await api('/listings');
+    const { listings } = await api('/listings?country=' + encodeURIComponent(browsingCountry));
     el.innerHTML = listings.length
       ? listings.slice(0, 6).map(listingCard).join('')
       : '<p class="muted" style="grid-column:1/-1;">لا توجد إعلانات بعد</p>';
@@ -394,10 +444,11 @@ function debouncedSearch() {
   searchDebounceTimer = setTimeout(renderSearch, 300);
 }
 async function renderSearch() {
+  document.getElementById('search-country').value = browsingCountry;
   renderCatStrip();
   document.getElementById('cat-name').textContent = selectedPartCategory || 'الكل';
   const q = document.getElementById('search-q').value.trim();
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ country: browsingCountry });
   if (q) params.set('q', q);
   if (selectedPartCategory) params.set('part_category', selectedPartCategory);
 
@@ -472,7 +523,7 @@ function debouncedMotoPartsSearch() {
 async function renderMotoParts() {
   renderMotoPartsCatStrip();
   const q = document.getElementById('moto-parts-q').value.trim();
-  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'part', make: motoContext.make });
+  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'part', make: motoContext.make, country: browsingCountry });
   if (q) params.set('q', q);
   if (selectedMotoPartCategory) params.set('part_category', selectedMotoPartCategory);
 
@@ -488,7 +539,7 @@ async function renderMotoParts() {
   }
 }
 async function renderMotoWhole() {
-  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'whole', make: motoContext.make });
+  const params = new URLSearchParams({ category: 'motorcycle', listing_type: 'whole', make: motoContext.make, country: browsingCountry });
   const el = document.getElementById('moto-whole-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
@@ -546,7 +597,7 @@ async function openDetail(id) {
         ${topBadge}
       </div>
       ${identityLine}
-      <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">${icon('map-pin', 'icon-xs')} ${escapeHtml(listing.city)}</p>
+      <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">${icon('map-pin', 'icon-xs')} ${escapeHtml(listing.city)}${countryInfo(listing.country) ? `، ${countryInfo(listing.country).flag} ${escapeHtml(countryInfo(listing.country).label)}` : ''}</p>
       ${listing.description ? `<p style="font-size:var(--fs-base); line-height:1.7; margin-bottom:14px;">${escapeHtml(listing.description)}</p>` : ''}
 
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;" onclick="openSeller('${seller.id}')">
@@ -613,6 +664,8 @@ function prepareCreateScreen() {
   document.getElementById('cl-moto-whole-model').value = '';
   document.getElementById('cl-moto-whole-year').value = '';
   document.getElementById('cl-moto-whole-damage').value = 'light';
+  document.getElementById('cl-country').value = browsingCountry;
+  onCreateCountryChange();
   selectedImages = [];
   renderThumbs();
   hideError('cl-error');
@@ -667,11 +720,13 @@ async function publishListing() {
   hideError('cl-error');
   const title = document.getElementById('cl-title').value.trim();
   const price = document.getElementById('cl-price').value;
+  const country = document.getElementById('cl-country').value;
   const city = document.getElementById('cl-city').value;
 
   const fd = new FormData();
   fd.append('title', title);
   fd.append('price', price);
+  fd.append('country', country);
   fd.append('city', city);
   fd.append('description', document.getElementById('cl-desc').value.trim());
 

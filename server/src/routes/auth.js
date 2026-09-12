@@ -4,7 +4,7 @@ const { pool } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { generateOtp, otpExpiry, sendOtpMock } = require('../utils/otp');
 const { serializeUser } = require('../utils/serialize');
-const { PHASE1_COUNTRY } = require('../utils/constants');
+const { COUNTRIES, COUNTRY_PHONE_CODE } = require('../utils/constants');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 const router = express.Router();
@@ -24,6 +24,7 @@ router.post(
       phone_number,
       email,
       age,
+      country,
       password,
       pledge_accepted,
       otp_channel,
@@ -34,6 +35,12 @@ router.post(
     }
     if (!['trader', 'individual'].includes(account_type)) {
       return res.status(400).json({ error: 'نوع حساب غير صالح' });
+    }
+    if (!COUNTRIES.includes(country)) {
+      return res.status(400).json({ error: 'اختر الدولة' });
+    }
+    if (!Object.values(COUNTRY_PHONE_CODE).includes(phone_country_code)) {
+      return res.status(400).json({ error: 'مفتاح جوال غير صالح' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
@@ -67,7 +74,7 @@ router.post(
         email,
         passwordHash,
         age || null,
-        PHASE1_COUNTRY,
+        country,
         otp_channel,
         code,
         otpExpiry(),

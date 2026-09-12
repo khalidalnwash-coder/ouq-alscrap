@@ -5,10 +5,13 @@ const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { saveImage } = require('../utils/storage');
 const { asyncHandler } = require('../utils/asyncHandler');
 const {
-  PHASE1_COUNTRY,
-  PHASE1_CURRENCY,
+  COUNTRIES,
+  COUNTRY_LABELS,
+  COUNTRY_FLAGS,
+  COUNTRY_PHONE_CODE,
+  COUNTRY_CURRENCY,
+  COUNTRY_CITIES,
   PART_CATEGORIES,
-  CITIES_SA,
   MOTORCYCLE_MAKES,
 } = require('../utils/constants');
 
@@ -68,25 +71,36 @@ function listingCard(l) {
 
 router.get('/meta', (_req, res) => {
   res.json({
+    countries: COUNTRIES.map((code) => ({
+      code,
+      label: COUNTRY_LABELS[code],
+      flag: COUNTRY_FLAGS[code],
+      currency: COUNTRY_CURRENCY[code],
+      phone_code: COUNTRY_PHONE_CODE[code],
+    })),
+    cities_by_country: COUNTRY_CITIES,
     part_categories: PART_CATEGORIES,
-    cities: CITIES_SA,
-    country: PHASE1_COUNTRY,
-    currency: PHASE1_CURRENCY,
     motorcycle_makes: MOTORCYCLE_MAKES,
   });
 });
 
-// GET /api/listings?category=&listing_type=&make=&q=&part_category=&city=
+// GET /api/listings?category=&listing_type=&make=&q=&part_category=&city=&country=
 // category defaults to 'spare_part' (the original car-parts browse/search screens
-// never sent a category param, so this keeps them working unchanged).
+// never sent a category param, so this keeps them working unchanged). country is
+// left unfiltered when omitted — cross-border search across the GCC is the point
+// (spec Section 1) — the client normally passes the user's browsing country.
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { q, part_category, city, category, listing_type, make } = req.query;
+    const { q, part_category, city, category, listing_type, make, country } = req.query;
     const effectiveCategory = category || 'spare_part';
     const clauses = ["status = 'active'", `category = $1`];
     const params = [effectiveCategory];
 
+    if (country) {
+      params.push(country);
+      clauses.push(`country = $${params.length}`);
+    }
     if (listing_type) {
       params.push(listing_type);
       clauses.push(`listing_type = $${params.length}`);
@@ -190,6 +204,7 @@ router.post(
       title,
       description,
       price,
+      country,
       city,
       category,
       listing_type,
@@ -205,8 +220,14 @@ router.post(
     if (!CATEGORIES.includes(effectiveCategory)) {
       return res.status(400).json({ error: 'فئة إعلان غير صالحة' });
     }
-    if (!title || !price || !city) {
-      return res.status(400).json({ error: 'عنوان الإعلان والسعر والمدينة مطلوبة' });
+    if (!title || !price || !country || !city) {
+      return res.status(400).json({ error: 'عنوان الإعلان والسعر والدولة والمدينة مطلوبة' });
+    }
+    if (!COUNTRIES.includes(country)) {
+      return res.status(400).json({ error: 'دولة غير صالحة' });
+    }
+    if (!COUNTRY_CITIES[country].includes(city)) {
+      return res.status(400).json({ error: 'اختر مدينة ضمن الدولة المحددة' });
     }
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
@@ -276,10 +297,10 @@ router.post(
           effectiveListingType,
           title,
           description || null,
-          PHASE1_COUNTRY,
+          country,
           city,
           priceNum,
-          PHASE1_CURRENCY,
+          COUNTRY_CURRENCY[country],
           finalPartCategory,
           finalMake,
           finalModel,
