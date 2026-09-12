@@ -4,12 +4,21 @@ const { pool } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { saveImage } = require('../utils/storage');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { PHASE1_COUNTRY, PHASE1_CURRENCY, PART_CATEGORIES, CITIES_SA } = require('../utils/constants');
+const {
+  PHASE1_COUNTRY,
+  PHASE1_CURRENCY,
+  PART_CATEGORIES,
+  CITIES_SA,
+  MOTORCYCLE_MAKES,
+} = require('../utils/constants');
 
 const router = express.Router();
 
 const MAX_IMAGES = 10;
 const MAX_IMAGE_MB = 5;
+const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
+const CATEGORIES = ['spare_part', 'motorcycle'];
+const LISTING_TYPES = ['part', 'whole'];
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -45,24 +54,46 @@ function listingCard(l) {
     currency: l.currency,
     city: l.city,
     country: l.country,
+    category: l.category,
+    listing_type: l.listing_type,
     part_category: l.part_category,
+    compatible_make: l.compatible_make,
+    compatible_model: l.compatible_model,
+    damage_severity: l.damage_severity,
     thumbnail_url: thumb,
     last_updated_at: l.last_updated_at,
   };
 }
 
 router.get('/meta', (_req, res) => {
-  res.json({ part_categories: PART_CATEGORIES, cities: CITIES_SA, country: PHASE1_COUNTRY, currency: PHASE1_CURRENCY });
+  res.json({
+    part_categories: PART_CATEGORIES,
+    cities: CITIES_SA,
+    country: PHASE1_COUNTRY,
+    currency: PHASE1_CURRENCY,
+    motorcycle_makes: MOTORCYCLE_MAKES,
+  });
 });
 
-// GET /api/listings?q=&part_category=&city=
+// GET /api/listings?category=&listing_type=&make=&q=&part_category=&city=
+// category defaults to 'spare_part' (the original car-parts browse/search screens
+// never sent a category param, so this keeps them working unchanged).
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { q, part_category, city } = req.query;
-    const clauses = ["status = 'active'"];
-    const params = [];
+    const { q, part_category, city, category, listing_type, make } = req.query;
+    const effectiveCategory = category || 'spare_part';
+    const clauses = ["status = 'active'", `category = $1`];
+    const params = [effectiveCategory];
 
+    if (listing_type) {
+      params.push(listing_type);
+      clauses.push(`listing_type = $${params.length}`);
+    }
+    if (make) {
+      params.push(make);
+      clauses.push(`compatible_make = $${params.length}`);
+    }
     if (q) {
       params.push(`%${q}%`);
       clauses.push(`(title ILIKE $${params.length} OR description ILIKE $${params.length})`);
@@ -121,11 +152,14 @@ router.get(
         currency: withMedia.currency,
         city: withMedia.city,
         country: withMedia.country,
+        category: withMedia.category,
+        listing_type: withMedia.listing_type,
         part_category: withMedia.part_category,
         compatible_make: withMedia.compatible_make,
         compatible_model: withMedia.compatible_model,
         compatible_year_from: withMedia.compatible_year_from,
         compatible_year_to: withMedia.compatible_year_to,
+        damage_severity: withMedia.damage_severity,
         status: withMedia.status,
         last_updated_at: withMedia.last_updated_at,
         created_at: withMedia.created_at,
@@ -151,18 +185,79 @@ router.post(
   requireAuth,
   upload.array('images', MAX_IMAGES),
   asyncHandler(async (req, res) => {
-    const { title, description, price, city, part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to } =
-      req.body || {};
+    const {
+      title,
+      description,
+      price,
+      city,
+      category,
+      listing_type,
+      part_category,
+      compatible_make,
+      compatible_model,
+      compatible_year_from,
+      compatible_year_to,
+      damage_severity,
+    } = req.body || {};
 
-    if (!title || !price || !city || !part_category) {
-      return res.status(400).json({ error: 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة' });
+    const effectiveCategory = category || 'spare_part';
+    if (!CATEGORIES.includes(effectiveCategory)) {
+      return res.status(400).json({ error: 'فئة إعلان غير صالحة' });
     }
-    if (!PART_CATEGORIES.includes(part_category)) {
-      return res.status(400).json({ error: 'فئة قطعة غير صالحة' });
+    if (!title || !price || !city) {
+      return res.status(400).json({ error: 'عنوان الإعلان والسعر والمدينة مطلوبة' });
     }
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
       return res.status(400).json({ error: 'سعر غير صالح' });
+    }
+
+    let effectiveListingType = 'part';
+    let finalMake = compatible_make || null;
+    let finalModel = compatible_model || null;
+    let finalYearFrom = compatible_year_from ? Number(compatible_year_from) : null;
+    let finalYearTo = compatible_year_to ? Number(compatible_year_to) : null;
+    let finalPartCategory = part_category || null;
+    let finalDamageSeverity = null;
+
+    if (effectiveCategory === 'motorcycle') {
+      if (!LISTING_TYPES.includes(listing_type)) {
+        return res.status(400).json({ error: 'نوع الإعلان (قطعة / دراجة كاملة) مطلوب' });
+      }
+      effectiveListingType = listing_type;
+
+      // The manufacturer grid (MOTORCYCLE_MAKES) is a selection convenience on
+      // the client; 'أخرى' there prompts the user for a custom name before
+      // ever calling this endpoint, so by the time a listing is created
+      // compatible_make is just a normal free-text manufacturer name — same
+      // as it already is for car parts.
+      if (!compatible_make || !compatible_make.trim()) {
+        return res.status(400).json({ error: 'الشركة المصنّعة مطلوبة' });
+      }
+      finalMake = compatible_make.trim();
+
+      if (effectiveListingType === 'part') {
+        if (!finalPartCategory || !PART_CATEGORIES.includes(finalPartCategory)) {
+          return res.status(400).json({ error: 'فئة القطعة مطلوبة' });
+        }
+      } else {
+        // whole motorcycle for sale: compatible_model/compatible_year_from
+        // store the bike's own model/year (not a "compatible with" reference).
+        if (!compatible_model || !compatible_year_from) {
+          return res.status(400).json({ error: 'موديل الدراجة وسنة الصنع مطلوبة' });
+        }
+        if (!damage_severity || !DAMAGE_LEVELS.includes(damage_severity)) {
+          return res.status(400).json({ error: 'درجة التلف مطلوبة' });
+        }
+        finalDamageSeverity = damage_severity;
+        finalPartCategory = null;
+        finalYearTo = null;
+      }
+    } else {
+      // spare_part (car parts) — original Phase 1 flow, unchanged.
+      if (!finalPartCategory || !PART_CATEGORIES.includes(finalPartCategory)) {
+        return res.status(400).json({ error: 'فئة قطعة غير صالحة' });
+      }
     }
 
     const client = await pool.connect();
@@ -170,23 +265,26 @@ router.post(
       await client.query('BEGIN');
       const result = await client.query(
         `INSERT INTO listings
-          (seller_id, category, title, description, country, city, price, currency,
-           part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to)
-         VALUES ($1,'spare_part',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          (seller_id, category, listing_type, title, description, country, city, price, currency,
+           part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to, damage_severity)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          RETURNING *`,
         [
           req.userId,
+          effectiveCategory,
+          effectiveListingType,
           title,
           description || null,
           PHASE1_COUNTRY,
           city,
           priceNum,
           PHASE1_CURRENCY,
-          part_category,
-          compatible_make || null,
-          compatible_model || null,
-          compatible_year_from ? Number(compatible_year_from) : null,
-          compatible_year_to ? Number(compatible_year_to) : null,
+          finalPartCategory,
+          finalMake,
+          finalModel,
+          finalYearFrom,
+          finalYearTo,
+          finalDamageSeverity,
         ]
       );
       const listing = result.rows[0];
