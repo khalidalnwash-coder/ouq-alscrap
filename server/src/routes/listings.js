@@ -60,6 +60,7 @@ function listingCard(l) {
     compatible_make: l.compatible_make,
     compatible_model: l.compatible_model,
     damage_severity: l.damage_severity,
+    status: l.status,
     thumbnail_url: thumb,
     last_updated_at: l.last_updated_at,
   };

@@ -61,6 +61,7 @@ function go(id) {
   if (id === 'create') prepareCreateScreen();
   if (id === 'profile') renderProfile();
   if (id === 'admin') renderAdmin();
+  if (id === 'my-listings') renderMyListings();
   if (id === 'moto-makes') renderMotoMakes();
   if (id === 'moto-parts') renderMotoParts();
   if (id === 'moto-whole') renderMotoWhole();
@@ -328,16 +329,21 @@ async function confirmForgotOtp() {
 }
 
 // ---------- listing cards ----------
-function listingCard(l) {
+const LISTING_STATUS_LABELS = { active: 'نشط', archived: 'مؤرشف', sold: 'مباع' };
+function listingCard(l, opts = {}) {
   const thumb = l.thumbnail_url
     ? `<img src="${l.thumbnail_url}" alt="">`
     : icon('package', 'icon-lg');
+  const statusBadge = opts.showStatus
+    ? `<div class="badge ${l.status === 'active' ? 'badge-success' : 'badge-warning'}" style="margin-top:6px;">${escapeHtml(LISTING_STATUS_LABELS[l.status] || l.status)}</div>`
+    : '';
   return `<div class="listing-card" onclick="openDetail('${l.id}')">
     <div class="listing-thumb">${thumb}</div>
     <div class="listing-info">
       <div class="title">${escapeHtml(l.title)}</div>
       <div class="price">${formatPrice(l.price, l.currency)}</div>
       <div class="loc">${icon('map-pin')} ${escapeHtml(l.city)}</div>
+      ${statusBadge}
     </div>
   </div>`;
 }
@@ -751,6 +757,22 @@ async function openSeller(id) {
     refreshIcons();
   } catch (err) {
     body.innerHTML = `<p class="muted">تعذّر تحميل البروفايل</p>`;
+  }
+}
+
+// ---------- my listings ----------
+async function renderMyListings() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  const el = document.getElementById('my-listings');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  try {
+    const { listings } = await api('/listings/mine');
+    el.innerHTML = listings.length
+      ? listings.map((l) => listingCard(l, { showStatus: true })).join('')
+      : '<p class="muted" style="grid-column:1/-1;">ما نشرت أي إعلان بعد</p>';
+    refreshIcons();
+  } catch (err) {
+    el.innerHTML = `<p class="muted" style="grid-column:1/-1;">تعذّر تحميل إعلاناتك</p>`;
   }
 }
 

@@ -385,6 +385,7 @@
         <div class="avatar" id="profile-avatar"></div>
         <div><p style="font-size:var(--fs-base); font-weight:700;" id="profile-name"></p><p class="muted" id="profile-email"></p></div>
       </div>
+      <div class="settings-row" onclick="go('my-listings')"><i data-lucide="list" class="icon"></i><span>إعلاناتي</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toast('قريباً')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toggleNotifRow()"><i data-lucide="bell" class="icon"></i><span>الإشعارات: <b id="notif-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
@@ -393,6 +394,12 @@
       <div class="settings-row" id="admin-row" style="display:none;" onclick="go('admin')"><i data-lucide="settings" class="icon"></i><span>لوحة التحكم (مسؤول)</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" style="border:none; color:var(--danger);" onclick="logout()"><i data-lucide="log-out" class="icon" style="color:var(--danger);"></i><span style="color:var(--danger);">تسجيل الخروج</span></div>
     </div>
+  </div>
+
+  <!-- ================= MY LISTINGS ================= -->
+  <div class="screen" id="screen-my-listings">
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>إعلاناتي</h2></div>
+    <div class="listing-grid" id="my-listings"></div>
   </div>
 
   <!-- ================= SUPPORT ================= -->
