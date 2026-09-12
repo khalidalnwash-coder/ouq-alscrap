@@ -239,3 +239,17 @@ button:active{ transform:translateY(1px); }
 .spinner-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; padding:32px 0; color:var(--text-muted); font-size:var(--fs-sm); grid-column:1/-1; }
 .spinner{ width:24px; height:24px; border-radius:50%; border:2.5px solid var(--border); border-top-color:var(--blue); animation:spin .7s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* Report reason picker (Section 10) — same radio-card language as the OTP method choice screen */
+.reason-row{
+  display:flex; justify-content:space-between; align-items:center; background:var(--bg);
+  border-radius:var(--radius); padding:14px; margin-bottom:9px; border:2px solid var(--border);
+  cursor:pointer; font-size:var(--fs-base); font-weight:500; transition:all .15s ease;
+}
+.reason-row.selected{ border-color:var(--blue); background:var(--blue-light); color:var(--blue); font-weight:600; }
+.reason-radio{ width:18px; height:18px; border-radius:50%; border:2px solid #C9CDD3; flex-shrink:0; }
+.reason-row.selected .reason-radio{ border-color:var(--blue); background:var(--blue); }
+
+/* Per-card actions on "إعلاناتي" (My Listings): bump / restore — Section 8 & 15 */
+.card-action-btn{ width:100%; border:1px solid var(--border); margin-top:6px; padding:7px; font-size:var(--fs-xs); }
+.card-action-btn:disabled{ opacity:.5; cursor:not-allowed; }

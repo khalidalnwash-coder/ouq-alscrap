@@ -382,6 +382,55 @@
     <div class="listing-grid" id="seller-listings"></div>
   </div>
 
+  <!-- ================= REPORT (listing or account) — spec Section 10 ================= -->
+  <div class="screen" id="screen-report">
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="report-title">الإبلاغ</h2></div>
+    <div class="card">
+      <p class="muted" id="report-subtitle" style="margin-bottom:16px;"></p>
+      <label>سبب البلاغ</label>
+      <div id="report-reasons"></div>
+      <div id="report-other-box" style="display:none;">
+        <label>تفاصيل السبب</label>
+        <textarea id="report-details" placeholder="اكتب تفاصيل البلاغ..."></textarea>
+      </div>
+      <p class="error-text" id="report-error" style="display:none;"></p>
+      <button class="btn-primary" id="report-submit" onclick="submitReport()">إرسال البلاغ</button>
+    </div>
+  </div>
+
+  <!-- ================= DEAL CONFIRMATION & COMMISSION SETTLEMENT — spec Section 11 ================= -->
+  <div class="screen" id="screen-deal-confirm">
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>تأكيد الصفقة وتسديد العمولة</h2></div>
+    <div class="card">
+      <label>عملة الصفقة</label>
+      <select id="dc-currency" onchange="recalcCommission()"></select>
+      <label>مبلغ الصفقة</label>
+      <input id="dc-amount" type="number" placeholder="0" oninput="recalcCommission()">
+
+      <div style="background:var(--bg); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">مبلغ الصفقة</span><span style="font-weight:600;" id="dc-amount-display">—</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">نسبة العمولة</span><span style="font-weight:600;" id="dc-rate-display">2.5%</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-base); border-top:1px solid var(--border); padding-top:8px;"><span style="font-weight:700;">العمولة المستحقة</span><span style="font-weight:700; color:var(--blue);" id="dc-commission-display">—</span></div>
+      </div>
+
+      <p style="font-size:var(--fs-xs); font-weight:600; color:var(--text-secondary); margin-bottom:8px;">حوّل مبلغ العمولة إلى الحساب البنكي التالي</p>
+      <div style="background:var(--blue-light); border-radius:var(--radius); padding:14px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span class="muted" style="font-size:var(--fs-xs);">اسم البنك</span><span style="font-weight:700;" id="dc-bank-name">—</span></div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="muted" style="font-size:var(--fs-xs);">رقم الآيبان</span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span style="font-weight:700; font-family:monospace;" id="dc-bank-iban">—</span>
+            <span style="cursor:pointer; color:var(--blue);" onclick="copyIban()"><i data-lucide="copy" class="icon icon-sm"></i></span>
+          </span>
+        </div>
+      </div>
+      <p class="muted" style="font-size:var(--fs-xs); margin-bottom:16px;">بيانات بنكية تجريبية مؤقتة — سيتم تحديثها ببيانات الحساب الرسمي قبل الإطلاق</p>
+
+      <p class="error-text" id="dc-error" style="display:none;"></p>
+      <button class="btn-primary" id="dc-submit" onclick="confirmDeal()">تم التحويل، تأكيد التسديد</button>
+    </div>
+  </div>
+
   <!-- ================= PROFILE / SETTINGS ================= -->
   <div class="screen" id="screen-profile">
     <div class="card" id="profile-body">
@@ -428,6 +477,7 @@
   <div class="screen" id="screen-admin">
     <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>لوحة التحكم</h2></div>
     <div class="card" id="admin-stats"></div>
+    <div class="card" id="admin-reports"></div>
     <div class="card" id="admin-users"></div>
   </div>
 

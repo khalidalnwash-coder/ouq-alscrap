@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { serializeUser } = require('../utils/serialize');
 const { asyncHandler } = require('../utils/asyncHandler');
+const { runArchivalSweep } = require('../jobs/archival');
 
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
@@ -44,6 +45,65 @@ router.patch(
     ]);
     if (!result.rows[0]) return res.status(404).json({ error: 'مستخدم غير موجود' });
     res.json({ user: serializeUser(result.rows[0]) });
+  })
+);
+
+// Report queue (spec Sections 10 & 14) — all Report records regardless of
+// target_type, newest first, with a review/resolve action.
+router.get(
+  '/reports',
+  asyncHandler(async (req, res) => {
+    const { status, target_type } = req.query;
+    const clauses = [];
+    const params = [];
+    if (status) {
+      params.push(status);
+      clauses.push(`r.status = $${params.length}`);
+    }
+    if (target_type) {
+      params.push(target_type);
+      clauses.push(`r.target_type = $${params.length}`);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await pool.query(
+      `SELECT r.*, u.full_name AS reporter_name,
+              CASE WHEN r.target_type = 'listing' THEN l.title ELSE tu.full_name END AS target_label
+       FROM reports r
+       JOIN users u ON u.id = r.reporter_id
+       LEFT JOIN listings l ON r.target_type = 'listing' AND l.id = r.target_id
+       LEFT JOIN users tu ON r.target_type = 'account' AND tu.id = r.target_id
+       ${where}
+       ORDER BY r.created_at DESC LIMIT 200`,
+      params
+    );
+    res.json({ reports: result.rows });
+  })
+);
+
+router.patch(
+  '/reports/:id/status',
+  asyncHandler(async (req, res) => {
+    const { status } = req.body || {};
+    if (!['pending', 'reviewed', 'resolved'].includes(status)) {
+      return res.status(400).json({ error: 'حالة غير صالحة' });
+    }
+    const result = await pool.query('UPDATE reports SET status = $1 WHERE id = $2 RETURNING *', [
+      status,
+      req.params.id,
+    ]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'بلاغ غير موجود' });
+    res.json({ report: result.rows[0] });
+  })
+);
+
+// Manual trigger for the auto-archival sweep (spec Section 15) — the same
+// sweep also runs on an interval from index.js; this exists for ops/testing
+// so an admin can force it without waiting for the next tick.
+router.post(
+  '/run-archival',
+  asyncHandler(async (_req, res) => {
+    const result = await runArchivalSweep();
+    res.json(result);
   })
 );
 

@@ -6,7 +6,7 @@ let chosenOtpMethod = 'whatsapp';
 let chosenFpMethod = 'whatsapp';
 let fpUserId = null;
 let currentUser = null;
-let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {} };
+let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, commission_rate: 0.025, bank_account: null };
 const COUNTRY_KEY = 'alscrap_country';
 let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
@@ -126,7 +126,7 @@ async function bootstrap() {
   try {
     meta = await api('/listings/meta');
   } catch {
-    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {} };
+    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, commission_rate: 0.025, bank_account: null };
   }
   populateMetaSelects();
 
@@ -387,6 +387,9 @@ async function confirmForgotOtp() {
 
 // ---------- listing cards ----------
 const LISTING_STATUS_LABELS = { active: 'نشط', archived: 'مؤرشف', sold: 'مباع' };
+const BUMP_COOLDOWN_HOURS = 24;
+const ARCHIVE_WARNING_DAYS = 45;
+const ARCHIVE_DAYS = 60;
 function listingCard(l, opts = {}) {
   const thumb = l.thumbnail_url
     ? `<img src="${l.thumbnail_url}" alt="">`
@@ -394,6 +397,23 @@ function listingCard(l, opts = {}) {
   const statusBadge = opts.showStatus
     ? `<div class="badge ${l.status === 'active' ? 'badge-success' : 'badge-warning'}" style="margin-top:6px;">${escapeHtml(LISTING_STATUS_LABELS[l.status] || l.status)}</div>`
     : '';
+
+  let actionsHtml = '';
+  if (opts.showActions && l.status === 'active') {
+    const hoursSince = (Date.now() - new Date(l.last_updated_at).getTime()) / 3600000;
+    const daysSince = Math.floor(hoursSince / 24);
+    const canBump = hoursSince >= BUMP_COOLDOWN_HOURS;
+    const warnHtml = daysSince >= ARCHIVE_WARNING_DAYS
+      ? `<div class="muted" style="font-size:var(--fs-xs); color:var(--warning); margin-top:4px; display:flex; align-items:center; gap:3px;">${icon('alert-triangle', 'icon-xs')} سيُؤرشف خلال ${Math.max(ARCHIVE_DAYS - daysSince, 0)} يوم</div>`
+      : '';
+    actionsHtml = `${warnHtml}
+      <button class="btn-ghost card-action-btn" ${canBump ? '' : 'disabled'} onclick="event.stopPropagation(); bumpListing('${l.id}')">
+        ${canBump ? 'حدّث الآن' : `متاح بعد ${Math.max(Math.ceil(BUMP_COOLDOWN_HOURS - hoursSince), 0)} س`}
+      </button>`;
+  } else if (opts.showActions && l.status === 'archived') {
+    actionsHtml = `<button class="btn-ghost card-action-btn" style="color:var(--blue);" onclick="event.stopPropagation(); restoreListing('${l.id}')">${icon('rotate-ccw', 'icon-xs')} استرجاع</button>`;
+  }
+
   return `<div class="listing-card" onclick="openDetail('${l.id}')">
     <div class="listing-thumb">${thumb}</div>
     <div class="listing-info">
@@ -401,8 +421,27 @@ function listingCard(l, opts = {}) {
       <div class="price">${formatPrice(l.price, l.currency)}</div>
       <div class="loc">${icon('map-pin')} ${escapeHtml(l.city)}</div>
       ${statusBadge}
+      ${actionsHtml}
     </div>
   </div>`;
+}
+async function bumpListing(id) {
+  try {
+    await api('/listings/' + id + '/bump', { method: 'PATCH' });
+    toast('تم تحديث الإعلان وإعادته لأعلى النتائج');
+    renderMyListings();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function restoreListing(id) {
+  try {
+    await api('/listings/' + id + '/restore', { method: 'PATCH' });
+    toast('تم استرجاع الإعلان');
+    renderMyListings();
+  } catch (err) {
+    toast(err.message);
+  }
 }
 function formatPrice(price, currency) {
   const cur = { SAR: 'ر.س', AED: 'د.إ', KWD: 'د.ك', QAR: 'ر.ق', BHD: 'د.ب', OMR: 'ر.ع' }[currency] || currency;
@@ -610,6 +649,8 @@ function openVehicleCreateWhole() {
 }
 
 // ---------- listing detail ----------
+let currentListingDetail = null;
+let currentSellerDetail = null;
 async function openDetail(id) {
   currentListingId = id;
   go('detail');
@@ -617,6 +658,9 @@ async function openDetail(id) {
   body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const { listing, seller } = await api('/listings/' + id);
+    currentListingDetail = listing;
+    currentSellerDetail = seller;
+    const isOwnListing = currentUser && seller && currentUser.id === seller.id;
     const img = listing.media[0]
       ? `<img src="${listing.media[0].url}" style="width:100%; height:100%; object-fit:cover;">`
       : icon('image', 'icon-xl');
@@ -656,10 +700,14 @@ async function openDetail(id) {
         <span class="muted">${seller.completed_deals_count} صفقة</span>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-bottom:12px; gap:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-bottom:12px; gap:8px;">
         <span style="font-size:var(--fs-xl); font-weight:700; color:var(--blue);">${formatPrice(listing.price, listing.currency)}</span>
-        <button class="btn-primary" style="width:auto; padding:11px 20px;" onclick="contactSeller('${seller.id}')">تواصل مع البائع</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn-primary" style="width:auto; padding:11px 20px;" onclick="contactSeller('${seller.id}')">تواصل مع البائع</button>
+          <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px;" title="إبلاغ عن الإعلان" onclick="openReportListing()">${icon('flag', 'icon-sm')}</button>
+        </div>
       </div>
+      ${!isOwnListing ? `<button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد العمولة</button>` : ''}
       <div id="contact-reveal"></div>
     `;
     refreshIcons();
@@ -690,6 +738,115 @@ async function contactSeller(sellerId) {
     refreshIcons();
   } catch (err) {
     toast(err.message);
+  }
+}
+
+// ---------- reporting (listings & accounts) — spec Section 10 ----------
+let reportTarget = { type: null, id: null, label: '', reason: null };
+function openReportListing() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  if (!currentListingDetail) return;
+  openReport('listing', currentListingDetail.id, currentListingDetail.title);
+}
+function openReportAccount() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  if (!currentSellerProfile) return;
+  openReport('account', currentSellerProfile.id, currentSellerProfile.full_name);
+}
+function openReport(type, id, label) {
+  reportTarget = { type, id, label, reason: null };
+  document.getElementById('report-title').textContent = type === 'listing' ? 'الإبلاغ عن إعلان' : 'الإبلاغ عن حساب';
+  document.getElementById('report-subtitle').textContent = label ? `الجهة: ${label}` : '';
+  document.getElementById('report-details').value = '';
+  document.getElementById('report-other-box').style.display = 'none';
+  hideError('report-error');
+  renderReportReasons();
+  go('report');
+}
+function renderReportReasons() {
+  const reasons = (meta.report_reasons && meta.report_reasons[reportTarget.type]) || [];
+  document.getElementById('report-reasons').innerHTML = reasons.map((r) => `
+    <div class="reason-row ${reportTarget.reason === r.value ? 'selected' : ''}" onclick="selectReportReason('${r.value}')">
+      <span>${escapeHtml(r.label)}</span>
+      <div class="reason-radio"></div>
+    </div>`).join('');
+}
+function selectReportReason(value) {
+  reportTarget.reason = value;
+  renderReportReasons();
+  document.getElementById('report-other-box').style.display = value === 'other' ? 'block' : 'none';
+}
+async function submitReport() {
+  hideError('report-error');
+  if (!reportTarget.reason) return showError('report-error', 'اختر سبب البلاغ');
+  const details = document.getElementById('report-details').value.trim();
+  if (reportTarget.reason === 'other' && !details) return showError('report-error', 'اكتب تفاصيل السبب');
+  const btn = document.getElementById('report-submit');
+  btn.disabled = true;
+  try {
+    await api('/reports', {
+      method: 'POST',
+      body: { target_type: reportTarget.type, target_id: reportTarget.id, reason: reportTarget.reason, details },
+    });
+    toast('تم إرسال البلاغ، شكراً لك');
+    goBack();
+  } catch (err) {
+    showError('report-error', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- deal confirmation & commission settlement — spec Section 11 ----------
+let dealContext = null;
+function openDealConfirm() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  if (!currentListingDetail || !currentSellerDetail) return;
+  dealContext = { listingId: currentListingDetail.id, currency: currentListingDetail.currency };
+  document.getElementById('dc-currency').innerHTML = Object.keys(CURRENCY_LABELS_AR)
+    .map((c) => `<option value="${c}" ${c === dealContext.currency ? 'selected' : ''}>${CURRENCY_LABELS_AR[c]} (${c})</option>`)
+    .join('');
+  document.getElementById('dc-amount').value = '';
+  document.getElementById('dc-rate-display').textContent = ((meta.commission_rate || 0.025) * 100).toFixed(1) + '%';
+  document.getElementById('dc-bank-name').textContent = (meta.bank_account && meta.bank_account.bank_name) || '—';
+  document.getElementById('dc-bank-iban').textContent = (meta.bank_account && meta.bank_account.iban) || '—';
+  hideError('dc-error');
+  recalcCommission();
+  go('deal-confirm');
+}
+function recalcCommission() {
+  const amount = Number(document.getElementById('dc-amount').value) || 0;
+  const currency = document.getElementById('dc-currency').value;
+  const rate = meta.commission_rate || 0.025;
+  document.getElementById('dc-amount-display').textContent = amount ? formatPrice(amount, currency) : '—';
+  document.getElementById('dc-commission-display').textContent = amount ? formatPrice(amount * rate, currency) : '—';
+}
+async function copyIban() {
+  const iban = ((meta.bank_account && meta.bank_account.iban) || '').replace(/\s/g, '');
+  try {
+    await navigator.clipboard.writeText(iban);
+    toast('تم نسخ رقم الآيبان');
+  } catch {
+    toast('تعذّر نسخ الآيبان');
+  }
+}
+async function confirmDeal() {
+  hideError('dc-error');
+  const amount = document.getElementById('dc-amount').value;
+  const currency = document.getElementById('dc-currency').value;
+  if (!amount || Number(amount) <= 0) return showError('dc-error', 'أدخل مبلغ صفقة صحيح');
+  const btn = document.getElementById('dc-submit');
+  btn.disabled = true;
+  btn.textContent = 'جارِ التأكيد...';
+  try {
+    await api('/transactions', { method: 'POST', body: { listing_id: dealContext.listingId, deal_amount: amount, currency } });
+    toast('تم تأكيد تسديد العمولة، شكراً لأمانتك');
+    goBack();
+  } catch (err) {
+    showError('dc-error', err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'تم التحويل، تأكيد التسديد';
   }
 }
 
@@ -855,6 +1012,7 @@ async function publishListing() {
 }
 
 // ---------- seller profile ----------
+let currentSellerProfile = null;
 async function openSeller(id) {
   go('seller');
   const body = document.getElementById('seller-body');
@@ -863,13 +1021,17 @@ async function openSeller(id) {
   listingsEl.innerHTML = '';
   try {
     const { seller, listings } = await api('/users/' + id + '/public');
+    currentSellerProfile = seller;
     body.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-        <div class="avatar" style="width:48px; height:48px; font-size:var(--fs-base);">${initials(seller.full_name)}</div>
-        <div>
-          <p style="font-size:var(--fs-base); font-weight:700; display:flex; align-items:center; gap:6px;">${escapeHtml(seller.full_name)} ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}</p>
-          <p class="muted">${seller.account_type === 'trader' ? 'تشليح / تاجر' : 'فرد / مشتري'}</p>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="avatar" style="width:48px; height:48px; font-size:var(--fs-base);">${initials(seller.full_name)}</div>
+          <div>
+            <p style="font-size:var(--fs-base); font-weight:700; display:flex; align-items:center; gap:6px;">${escapeHtml(seller.full_name)} ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}</p>
+            <p class="muted">${seller.account_type === 'trader' ? 'تشليح / تاجر' : 'فرد / مشتري'}</p>
+          </div>
         </div>
+        <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px;" title="إبلاغ عن الحساب" onclick="openReportAccount()">${icon('flag', 'icon-sm')}</button>
       </div>
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
@@ -893,7 +1055,7 @@ async function renderMyListings() {
   try {
     const { listings } = await api('/listings/mine');
     el.innerHTML = listings.length
-      ? listings.map((l) => listingCard(l, { showStatus: true })).join('')
+      ? listings.map((l) => listingCard(l, { showStatus: true, showActions: true })).join('')
       : '<p class="muted" style="grid-column:1/-1;">ما نشرت أي إعلان بعد</p>';
     refreshIcons();
   } catch (err) {
@@ -926,11 +1088,22 @@ async function toggleNotifRow() {
 }
 
 // ---------- admin ----------
+const REPORT_STATUS_LABELS = { pending: 'قيد المراجعة', reviewed: 'تمت المراجعة', resolved: 'تم الحل' };
+const REPORT_REASON_LABEL_MAP = {}; // filled lazily from meta.report_reasons on first admin render
+function reportReasonLabel(reason) {
+  if (!Object.keys(REPORT_REASON_LABEL_MAP).length) {
+    [...(meta.report_reasons.listing || []), ...(meta.report_reasons.account || [])]
+      .forEach((r) => { REPORT_REASON_LABEL_MAP[r.value] = r.label; });
+  }
+  return REPORT_REASON_LABEL_MAP[reason] || reason;
+}
 async function renderAdmin() {
   if (!currentUser || !currentUser.is_admin) { toast('صلاحية مسؤول مطلوبة'); return go('profile'); }
   const statsEl = document.getElementById('admin-stats');
+  const reportsEl = document.getElementById('admin-reports');
   const usersEl = document.getElementById('admin-users');
   statsEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  reportsEl.innerHTML = '';
   usersEl.innerHTML = '';
   try {
     const stats = await api('/admin/stats');
@@ -940,6 +1113,22 @@ async function renderAdmin() {
       <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">إعلانات اليوم</span><span style="font-weight:600;">${stats.listings_posted_today}</span></div>
       <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm);"><span class="muted">إجمالي الإعلانات النشطة</span><span style="font-weight:600;">${stats.active_listings_count}</span></div>
     `;
+
+    const { reports } = await api('/admin/reports?status=pending');
+    reportsEl.innerHTML = '<h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">بلاغات قيد المراجعة</h3>' + (reports.length
+      ? reports.map((r) => `
+        <div class="settings-row" style="align-items:flex-start;">
+          <span class="badge ${r.target_type === 'listing' ? 'badge-warning' : 'badge-danger'}" style="margin-top:2px;">${r.target_type === 'listing' ? 'إعلان' : 'حساب'}</span>
+          <span>
+            <b>${escapeHtml(r.target_label || '—')}</b><br>
+            <span class="muted">${escapeHtml(reportReasonLabel(r.reason))}${r.details ? ' — ' + escapeHtml(r.details) : ''}</span><br>
+            <span class="muted" style="font-size:var(--fs-xs);">بلّغ عنه: ${escapeHtml(r.reporter_name)}</span>
+          </span>
+          <button class="btn-ghost" style="border:1px solid var(--border);" onclick="resolveReport('${r.id}')">حل البلاغ</button>
+        </div>
+      `).join('')
+      : '<p class="muted">لا توجد بلاغات قيد المراجعة</p>');
+
     const { users } = await api('/admin/users');
     usersEl.innerHTML = '<h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إدارة الحسابات</h3>' + users.map((u) => `
       <div class="settings-row">
@@ -950,6 +1139,15 @@ async function renderAdmin() {
     `).join('');
   } catch (err) {
     statsEl.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+async function resolveReport(id) {
+  try {
+    await api('/admin/reports/' + id + '/status', { method: 'PATCH', body: { status: 'resolved' } });
+    toast('تم تحديث حالة البلاغ');
+    renderAdmin();
+  } catch (err) {
+    toast(err.message);
   }
 }
 async function toggleUserStatus(id, currentStatus) {

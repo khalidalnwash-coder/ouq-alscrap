@@ -16,6 +16,13 @@ const {
   VEHICLE_CATEGORIES,
   VEHICLE_MAKES,
   VEHICLE_MODELS_BY_MAKE,
+  REPORT_REASONS_LISTING,
+  REPORT_REASONS_ACCOUNT,
+  COMMISSION_RATE,
+  BANK_ACCOUNT,
+  ARCHIVE_WARNING_DAYS,
+  ARCHIVE_DAYS,
+  MAX_ACTIVE_LISTINGS_PER_ACCOUNT,
 } = require('../utils/constants');
 
 const router = express.Router();
@@ -25,6 +32,7 @@ const MAX_IMAGE_MB = 5;
 const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
 const CATEGORIES = ['spare_part', ...VEHICLE_CATEGORIES];
 const LISTING_TYPES = ['part', 'whole'];
+const BUMP_COOLDOWN_HOURS = 24;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -69,6 +77,8 @@ function listingCard(l) {
     status: l.status,
     thumbnail_url: thumb,
     last_updated_at: l.last_updated_at,
+    archive_warning_sent_at: l.archive_warning_sent_at,
+    archived_at: l.archived_at,
   };
 }
 
@@ -89,6 +99,12 @@ router.get('/meta', (_req, res) => {
         { label: VEHICLE_LABELS[cat], makes: VEHICLE_MAKES[cat], models_by_make: VEHICLE_MODELS_BY_MAKE[cat] },
       ])
     ),
+    report_reasons: { listing: REPORT_REASONS_LISTING, account: REPORT_REASONS_ACCOUNT },
+    commission_rate: COMMISSION_RATE,
+    bank_account: BANK_ACCOUNT,
+    bump_cooldown_hours: BUMP_COOLDOWN_HOURS,
+    archive_warning_days: ARCHIVE_WARNING_DAYS,
+    archive_days: ARCHIVE_DAYS,
   });
 });
 
@@ -246,6 +262,17 @@ router.post(
       return res.status(400).json({ error: 'سعر غير صالح' });
     }
 
+    // Per-account cap on total active listings (spec Section 15 — storage-abuse guard).
+    const activeCountRes = await pool.query(
+      "SELECT count(*)::int AS n FROM listings WHERE seller_id = $1 AND status = 'active'",
+      [req.userId]
+    );
+    if (activeCountRes.rows[0].n >= MAX_ACTIVE_LISTINGS_PER_ACCOUNT) {
+      return res.status(400).json({
+        error: `وصلت للحد الأقصى لعدد الإعلانات النشطة (${MAX_ACTIVE_LISTINGS_PER_ACCOUNT}) — احذف أو أرشف إعلاناً قديماً لإضافة جديد`,
+      });
+    }
+
     let effectiveListingType = 'part';
     let finalMake = compatible_make || null;
     let finalModel = compatible_model || null;
@@ -342,6 +369,59 @@ router.post(
     } finally {
       client.release();
     }
+  })
+);
+
+// PATCH /api/listings/:id/bump — spec Section 8, the free daily "حدّث الآن"
+// mechanic (explicitly replaces any pay-to-promote feature at launch). The
+// 24h cooldown is re-validated server-side, never trusted from the client
+// button's disabled state.
+router.patch(
+  '/:id/bump',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id, status, last_updated_at FROM listings WHERE id = $1', [
+      req.params.id,
+    ]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+    if (listing.status !== 'active') return res.status(400).json({ error: 'لا يمكن تحديث إعلان غير نشط' });
+
+    const hoursSinceUpdate = (Date.now() - new Date(listing.last_updated_at).getTime()) / 3600000;
+    if (hoursSinceUpdate < BUMP_COOLDOWN_HOURS) {
+      return res.status(400).json({ error: `التحديث متاح بعد ${Math.ceil(BUMP_COOLDOWN_HOURS - hoursSinceUpdate)} س` });
+    }
+
+    const result = await pool.query(
+      `UPDATE listings SET last_updated_at = now(), archive_warning_sent_at = NULL
+       WHERE id = $1 RETURNING last_updated_at`,
+      [req.params.id]
+    );
+    res.json({ last_updated_at: result.rows[0].last_updated_at });
+  })
+);
+
+// PATCH /api/listings/:id/restore — spec Section 13/15: an archived listing
+// keeps a manual "استرجاع" (restore) action available until the hard-delete
+// sweep removes it permanently.
+router.patch(
+  '/:id/restore',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id, status FROM listings WHERE id = $1', [req.params.id]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+    if (listing.status !== 'archived') return res.status(400).json({ error: 'الإعلان غير مؤرشف' });
+
+    await pool.query(
+      `UPDATE listings
+       SET status = 'active', last_updated_at = now(), archived_at = NULL, archive_warning_sent_at = NULL
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
   })
 );
 

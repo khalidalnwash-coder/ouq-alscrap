@@ -187,6 +187,48 @@ const VEHICLE_MODELS_BY_MAKE = {
   truck: TRUCK_MODELS_BY_MAKE,
 };
 
+// ---------------------------------------------------------------------------
+// Reporting system (spec Section 10). Two distinct report targets, each with
+// its own reason list. "Commission evasion" is intentionally never a
+// selectable reason on either list — an explicit product decision (commission
+// compliance is left to the personal pledge in Section 9, not policed here).
+const REPORT_REASONS_LISTING = [
+  { value: 'description_mismatch', label: 'الوصف لا يطابق الواقع' },
+  { value: 'suspected_fraud', label: 'اشتباه في احتيال' },
+  { value: 'inappropriate_content', label: 'محتوى غير لائق' },
+  { value: 'other', label: 'سبب آخر' },
+];
+const REPORT_REASONS_ACCOUNT = [
+  { value: 'fake_account', label: 'حساب وهمي / نصب واحتيال' },
+  { value: 'repeated_inaccurate_listings', label: 'وصف الإعلانات مخالف للواقع بشكل متكرر' },
+  { value: 'fake_images', label: 'صور غير حقيقية أو منسوخة من مصدر آخر' },
+  { value: 'took_payment_no_delivery', label: 'استلام مبلغ دون تسليم القطعة أو السيارة' },
+  { value: 'abusive_conduct', label: 'تعامل مسيء أو غير لائق' },
+  { value: 'other', label: 'سبب آخر' },
+];
+
+// ---------------------------------------------------------------------------
+// Transaction confirmation & commission settlement (spec Section 11).
+// COMMISSION_RATE is the pledged 2.5% from Section 9's commitment text.
+// BANK_ACCOUNT is EXPLICITLY placeholder/test data per product owner
+// direction — must be replaced with the real project bank account before
+// public launch. Not the business's own account yet, so no QR/instant-
+// transfer network branding either (deferred per spec Section 11).
+const COMMISSION_RATE = 0.025;
+const BANK_ACCOUNT = {
+  bank_name: 'مصرف الراجحي',
+  iban: 'SA00 0000 0000 0000 0000 00',
+  is_placeholder: true,
+};
+
+// ---------------------------------------------------------------------------
+// Auto-archival policy (spec Section 15), driven by listings.last_updated_at.
+const ARCHIVE_WARNING_DAYS = 45; // day 45: push the "update within 15 days" reminder
+const ARCHIVE_DAYS = 60; // day 60: hide from search, flip to status='archived'
+const HARD_DELETE_DAYS_AFTER_ARCHIVE = 90; // 90 more days archived -> permanent delete
+// Per-account cap on total active listings (storage-abuse guard, Section 15).
+const MAX_ACTIVE_LISTINGS_PER_ACCOUNT = 60;
+
 module.exports = {
   COUNTRIES,
   DEFAULT_COUNTRY,
@@ -203,5 +245,13 @@ module.exports = {
   VEHICLE_CATEGORIES,
   VEHICLE_MAKES,
   VEHICLE_MODELS_BY_MAKE,
+  REPORT_REASONS_LISTING,
+  REPORT_REASONS_ACCOUNT,
+  COMMISSION_RATE,
+  BANK_ACCOUNT,
+  ARCHIVE_WARNING_DAYS,
+  ARCHIVE_DAYS,
+  HARD_DELETE_DAYS_AFTER_ARCHIVE,
+  MAX_ACTIVE_LISTINGS_PER_ACCOUNT,
   MOTORCYCLE_MAKES,
 };
