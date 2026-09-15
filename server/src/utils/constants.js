@@ -1,16 +1,79 @@
-// Phase 1 scope: single country (Saudi Arabia), single listing category (spare parts).
-// Full GCC country/currency lists are kept here (not just SA) so Phase 2 can widen
-// scope by relaxing the API-layer checks below, without touching the DB schema.
+// GCC-wide country/currency data. Phase 1 originally launched Saudi-only;
+// per explicit product direction this now opens up to all six GCC
+// countries (signup, listing location, browsing/search) — the DB schema
+// already supported this from day one (see schema.sql), so this widening
+// is purely an API/UI change, no migration needed.
 
 const COUNTRIES = ['SA', 'AE', 'KW', 'QA', 'BH', 'OM'];
-const PHASE1_COUNTRY = 'SA';
+const DEFAULT_COUNTRY = 'SA';
+
+const COUNTRY_LABELS = {
+  SA: 'السعودية',
+  AE: 'الإمارات',
+  KW: 'الكويت',
+  QA: 'قطر',
+  BH: 'البحرين',
+  OM: 'عُمان',
+};
+
+// Flag emoji are a deliberate, explicit exception to the "no emoji in the
+// UI" design rule — there is no icon-font equivalent for national flags,
+// and a country selector without one reads as broken to users used to the
+// convention. Used only for country pickers, nowhere else.
+const COUNTRY_FLAGS = {
+  SA: '🇸🇦',
+  AE: '🇦🇪',
+  KW: '🇰🇼',
+  QA: '🇶🇦',
+  BH: '🇧🇭',
+  OM: '🇴🇲',
+};
+
+const COUNTRY_PHONE_CODE = {
+  SA: '+966',
+  AE: '+971',
+  KW: '+965',
+  QA: '+974',
+  BH: '+973',
+  OM: '+968',
+};
+
+// Each GCC country has one native currency, so a listing's currency is
+// always derived server-side from its country — never taken from the
+// client — to keep the two consistent.
+const COUNTRY_CURRENCY = {
+  SA: 'SAR',
+  AE: 'AED',
+  KW: 'KWD',
+  QA: 'QAR',
+  BH: 'BHD',
+  OM: 'OMR',
+};
 
 const CURRENCIES = ['SAR', 'AED', 'KWD', 'QAR', 'BHD', 'OMR'];
-const PHASE1_CURRENCY = 'SAR';
+const DEFAULT_CURRENCY = 'SAR';
 
-const CITIES_SA = ['الرياض', 'جدة', 'الدمام', 'مكة المكرمة', 'المدينة المنورة', 'الطائف', 'تبوك', 'الخبر'];
+const CURRENCY_LABELS = {
+  SAR: 'ريال سعودي',
+  AED: 'درهم إماراتي',
+  KWD: 'دينار كويتي',
+  QAR: 'ريال قطري',
+  BHD: 'دينار بحريني',
+  OMR: 'ريال عماني',
+};
+
+const COUNTRY_CITIES = {
+  SA: ['الرياض', 'جدة', 'الدمام', 'مكة المكرمة', 'المدينة المنورة', 'الطائف', 'تبوك', 'الخبر'],
+  AE: ['دبي', 'أبوظبي', 'الشارقة', 'عجمان', 'رأس الخيمة', 'الفجيرة', 'أم القيوين', 'العين'],
+  KW: ['مدينة الكويت', 'حولي', 'الفروانية', 'الجهراء', 'الأحمدي', 'مبارك الكبير'],
+  QA: ['الدوحة', 'الريان', 'الوكرة', 'الخور', 'أم صلال', 'الشمال'],
+  BH: ['المنامة', 'المحرق', 'الرفاع', 'مدينة عيسى', 'مدينة حمد', 'سترة'],
+  OM: ['مسقط', 'صلالة', 'صحار', 'نزوى', 'صور', 'البريمي'],
+};
 
 // Section 6 of the spec — spare-part category taxonomy.
+// Reused as-is for motorcycle parts too (product decision: same taxonomy,
+// no separate motorcycle-specific part categories).
 const PART_CATEGORIES = [
   'مصابيح وإضاءة',
   'زجاج',
@@ -26,11 +89,169 @@ const PART_CATEGORIES = [
   'أخرى',
 ];
 
+// ---------------------------------------------------------------------------
+// "Vehicle sections" — دراجات نارية / سيارات كاملة / شاحنات وتريلات.
+// Each is the same pattern: pick a manufacturer (+ "أخرى" for a custom name)
+// -> browse/post parts for that manufacturer (with an optional model filter)
+// -> or browse/post a whole damaged vehicle (manufacturer + model + year +
+// damage_severity required). All three reuse the listings/listing_media
+// tables — category is 'motorcycle' | 'full_car' | 'truck', distinguished
+// from a part by listing_type ('part' | 'whole'). This is unrelated to the
+// original ungated "قطع غيار" (category='spare_part') flow, which stays a
+// separate, simpler, manufacturer-optional flow as it always was.
+//
+// Model lists are a curated, practically-sized set of common GCC-market
+// models per manufacturer — not an exhaustive catalog. 'أخرى' at the model
+// level (present for every manufacturer) covers anything not listed, same
+// pattern as the manufacturer-level 'أخرى'.
+
+const VEHICLE_LABELS = {
+  motorcycle: 'دراجة نارية',
+  full_car: 'سيارة',
+  truck: 'شاحنة',
+};
+
+const MOTORCYCLE_MAKES = [
+  'ياماها', 'هوندا', 'كاواساكي', 'سوزوكي', 'BMW', 'دوكاتي',
+  'هارلي ديفيدسون', 'KTM', 'تريومف', 'رويال إنفيلد',
+  'لِفان', 'سي إف موتو', 'أخرى',
+];
+const MOTORCYCLE_MODELS_BY_MAKE = {
+  'ياماها': ['R1', 'R6', 'MT-07', 'MT-09', 'YZF-R3', 'Tenere 700', 'XSR900', 'أخرى'],
+  'هوندا': ['CBR500R', 'CBR600RR', 'CBR1000RR', 'CB650R', 'Africa Twin', 'Rebel 500', 'أخرى'],
+  'كاواساكي': ['Ninja 300', 'Ninja 400', 'Ninja ZX-6R', 'Ninja ZX-10R', 'Z650', 'Z900', 'Versys 650', 'أخرى'],
+  'سوزوكي': ['GSX-R600', 'GSX-R750', 'GSX-R1000', 'SV650', 'V-Strom 650', 'أخرى'],
+  'BMW': ['S1000RR', 'R1250GS', 'F850GS', 'G310R', 'أخرى'],
+  'دوكاتي': ['Panigale V2', 'Panigale V4', 'Monster', 'Multistrada', 'أخرى'],
+  'هارلي ديفيدسون': ['Iron 883', 'Street Bob', 'Road King', 'Fat Boy', 'أخرى'],
+  'KTM': ['Duke 390', 'Duke 790', 'RC 390', 'Adventure 390', 'أخرى'],
+  'تريومف': ['Street Triple', 'Speed Triple', 'Tiger 900', 'Bonneville', 'أخرى'],
+  'رويال إنفيلد': ['Classic 350', 'Meteor 350', 'Himalayan', 'Continental GT', 'أخرى'],
+  'لِفان': ['KPR 150', 'KPR 200', 'KP Mini', 'KPT 200', 'أخرى'],
+  'سي إف موتو': ['250SR', '300SR', '650NK', '700CL-X', 'MT650', 'أخرى'],
+};
+
+const CAR_MAKES = [
+  'تويوتا', 'نيسان', 'هيونداي', 'كيا', 'مرسيدس-بنز', 'بي إم دبليو',
+  'لكزس', 'فورد', 'شيفروليه', 'جي إم سي', 'هوندا', 'ميتسوبيشي',
+  'جيلي', 'إم جي', 'شانجان', 'جاك', 'هافال', 'بايك', 'أخرى',
+];
+const CAR_MODELS_BY_MAKE = {
+  'تويوتا': ['كامري', 'كورولا', 'لاند كروزر', 'هايلكس', 'برادو', 'يارس', 'راف 4', 'أفالون', 'أخرى'],
+  'نيسان': ['التيما', 'صني', 'باترول', 'إكس تريل', 'نافارا', 'مكسيما', 'أخرى'],
+  'هيونداي': ['سوناتا', 'النترا', 'توسان', 'سنتافي', 'أكسنت', 'أخرى'],
+  'كيا': ['سيراتو', 'سبورتاج', 'أوبتيما', 'ريو', 'سورينتو', 'أخرى'],
+  'مرسيدس-بنز': ['C200', 'E200', 'S500', 'GLE', 'GLC', 'أخرى'],
+  'بي إم دبليو': ['320i', '520i', 'X5', 'X3', 'X6', 'أخرى'],
+  'لكزس': ['ES350', 'LX570', 'RX350', 'GX460', 'أخرى'],
+  'فورد': ['F150', 'إكسبلورر', 'فيوجن', 'موستنج', 'أخرى'],
+  'شيفروليه': ['تاهو', 'كابرس', 'ماليبو', 'سلفرادو', 'أخرى'],
+  'جي إم سي': ['يوكن', 'سييرا', 'أكاديا', 'أخرى'],
+  'هوندا': ['أكورد', 'سيفيك', 'سي آر في', 'بايلوت', 'أخرى'],
+  'ميتسوبيشي': ['لانسر', 'باجيرو', 'أوتلاندر', 'أخرى'],
+  'جيلي': ['إمجراند', 'كولراي', 'عزخير', 'أوكافانجو', 'GC9', 'أخرى'],
+  'إم جي': ['MG5', 'MG6', 'ZS', 'RX5', 'HS', 'GT', 'أخرى'],
+  'شانجان': ['CS35', 'CS55', 'CS75', 'ألسفين', 'إيدو', 'أخرى'],
+  'جاك': ['J4', 'J7', 'S3', 'S7', 'JS4', 'أخرى'],
+  'هافال': ['H6', 'H2', 'جوليون', 'دارجو', 'F7', 'أخرى'],
+  'بايك': ['X25', 'X55', 'X7', 'D20', 'أخرى'],
+};
+
+const TRUCK_MAKES = [
+  'مرسيدس-بنز', 'فولفو', 'سكانيا', 'MAN', 'إيسوزو', 'هينو',
+  'إيفيكو', 'فوسو', 'داف', 'فريتلاينر', 'ماك', 'سينوتراك',
+  'فوتون', 'دونغفنغ', 'أخرى',
+];
+const TRUCK_MODELS_BY_MAKE = {
+  'مرسيدس-بنز': ['أكتروس', 'أروكس', 'أكسور', 'أتيغو', 'أخرى'],
+  'فولفو': ['FH', 'FM', 'FMX', 'FH16', 'أخرى'],
+  'سكانيا': ['R-Series', 'G-Series', 'P-Series', 'S-Series', 'أخرى'],
+  'MAN': ['TGX', 'TGS', 'TGM', 'TGL', 'أخرى'],
+  'إيسوزو': ['NPR', 'FVR', 'FRR', 'NQR', 'أخرى'],
+  'هينو': ['300 Series', '500 Series', '700 Series', 'أخرى'],
+  'إيفيكو': ['Eurocargo', 'Trakker', 'Stralis', 'أخرى'],
+  'فوسو': ['Canter', 'Fighter', 'Super Great', 'أخرى'],
+  'داف': ['XF', 'CF', 'LF', 'أخرى'],
+  'فريتلاينر': ['Cascadia', 'Coronado', 'M2', 'أخرى'],
+  'ماك': ['Anthem', 'Granite', 'Pinnacle', 'أخرى'],
+  'سينوتراك': ['هاوو A7', 'هاوو T7', 'هاوو T5G', 'أخرى'],
+  'فوتون': ['أومارك C', 'أومارك S', 'فيو CS2', 'تونلاند', 'أخرى'],
+  'دونغفنغ': ['كينلاند', 'كابتن', 'دوليكا', 'KR', 'أخرى'],
+};
+
+const VEHICLE_CATEGORIES = ['motorcycle', 'full_car', 'truck'];
+const VEHICLE_MAKES = { motorcycle: MOTORCYCLE_MAKES, full_car: CAR_MAKES, truck: TRUCK_MAKES };
+const VEHICLE_MODELS_BY_MAKE = {
+  motorcycle: MOTORCYCLE_MODELS_BY_MAKE,
+  full_car: CAR_MODELS_BY_MAKE,
+  truck: TRUCK_MODELS_BY_MAKE,
+};
+
+// ---------------------------------------------------------------------------
+// Reporting system (spec Section 10). Two distinct report targets, each with
+// its own reason list. "Commission evasion" is intentionally never a
+// selectable reason on either list — an explicit product decision (commission
+// compliance is left to the personal pledge in Section 9, not policed here).
+const REPORT_REASONS_LISTING = [
+  { value: 'description_mismatch', label: 'الوصف لا يطابق الواقع' },
+  { value: 'suspected_fraud', label: 'اشتباه في احتيال' },
+  { value: 'inappropriate_content', label: 'محتوى غير لائق' },
+  { value: 'other', label: 'سبب آخر' },
+];
+const REPORT_REASONS_ACCOUNT = [
+  { value: 'fake_account', label: 'حساب وهمي / نصب واحتيال' },
+  { value: 'repeated_inaccurate_listings', label: 'وصف الإعلانات مخالف للواقع بشكل متكرر' },
+  { value: 'fake_images', label: 'صور غير حقيقية أو منسوخة من مصدر آخر' },
+  { value: 'took_payment_no_delivery', label: 'استلام مبلغ دون تسليم القطعة أو السيارة' },
+  { value: 'abusive_conduct', label: 'تعامل مسيء أو غير لائق' },
+  { value: 'other', label: 'سبب آخر' },
+];
+
+// ---------------------------------------------------------------------------
+// Transaction confirmation & commission settlement (spec Section 11).
+// COMMISSION_RATE is the pledged 2.5% from Section 9's commitment text.
+// BANK_ACCOUNT is EXPLICITLY placeholder/test data per product owner
+// direction — must be replaced with the real project bank account before
+// public launch. Not the business's own account yet, so no QR/instant-
+// transfer network branding either (deferred per spec Section 11).
+const COMMISSION_RATE = 0.025;
+const BANK_ACCOUNT = {
+  bank_name: 'مصرف الراجحي',
+  iban: 'SA00 0000 0000 0000 0000 00',
+  is_placeholder: true,
+};
+
+// ---------------------------------------------------------------------------
+// Auto-archival policy (spec Section 15), driven by listings.last_updated_at.
+const ARCHIVE_WARNING_DAYS = 45; // day 45: push the "update within 15 days" reminder
+const ARCHIVE_DAYS = 60; // day 60: hide from search, flip to status='archived'
+const HARD_DELETE_DAYS_AFTER_ARCHIVE = 90; // 90 more days archived -> permanent delete
+// Per-account cap on total active listings (storage-abuse guard, Section 15).
+const MAX_ACTIVE_LISTINGS_PER_ACCOUNT = 60;
+
 module.exports = {
   COUNTRIES,
-  PHASE1_COUNTRY,
+  DEFAULT_COUNTRY,
+  COUNTRY_LABELS,
+  COUNTRY_FLAGS,
+  COUNTRY_PHONE_CODE,
+  COUNTRY_CURRENCY,
   CURRENCIES,
-  PHASE1_CURRENCY,
-  CITIES_SA,
+  DEFAULT_CURRENCY,
+  CURRENCY_LABELS,
+  COUNTRY_CITIES,
   PART_CATEGORIES,
+  VEHICLE_LABELS,
+  VEHICLE_CATEGORIES,
+  VEHICLE_MAKES,
+  VEHICLE_MODELS_BY_MAKE,
+  REPORT_REASONS_LISTING,
+  REPORT_REASONS_ACCOUNT,
+  COMMISSION_RATE,
+  BANK_ACCOUNT,
+  ARCHIVE_WARNING_DAYS,
+  ARCHIVE_DAYS,
+  HARD_DELETE_DAYS_AFTER_ARCHIVE,
+  MAX_ACTIVE_LISTINGS_PER_ACCOUNT,
+  MOTORCYCLE_MAKES,
 };

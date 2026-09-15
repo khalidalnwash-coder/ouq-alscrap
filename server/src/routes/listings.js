@@ -4,12 +4,35 @@ const { pool } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { saveImage } = require('../utils/storage');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { PHASE1_COUNTRY, PHASE1_CURRENCY, PART_CATEGORIES, CITIES_SA } = require('../utils/constants');
+const {
+  COUNTRIES,
+  COUNTRY_LABELS,
+  COUNTRY_FLAGS,
+  COUNTRY_PHONE_CODE,
+  COUNTRY_CURRENCY,
+  COUNTRY_CITIES,
+  PART_CATEGORIES,
+  VEHICLE_LABELS,
+  VEHICLE_CATEGORIES,
+  VEHICLE_MAKES,
+  VEHICLE_MODELS_BY_MAKE,
+  REPORT_REASONS_LISTING,
+  REPORT_REASONS_ACCOUNT,
+  COMMISSION_RATE,
+  BANK_ACCOUNT,
+  ARCHIVE_WARNING_DAYS,
+  ARCHIVE_DAYS,
+  MAX_ACTIVE_LISTINGS_PER_ACCOUNT,
+} = require('../utils/constants');
 
 const router = express.Router();
 
 const MAX_IMAGES = 10;
 const MAX_IMAGE_MB = 5;
+const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
+const CATEGORIES = ['spare_part', ...VEHICLE_CATEGORIES];
+const LISTING_TYPES = ['part', 'whole'];
+const BUMP_COOLDOWN_HOURS = 24;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -45,24 +68,75 @@ function listingCard(l) {
     currency: l.currency,
     city: l.city,
     country: l.country,
+    category: l.category,
+    listing_type: l.listing_type,
     part_category: l.part_category,
+    compatible_make: l.compatible_make,
+    compatible_model: l.compatible_model,
+    damage_severity: l.damage_severity,
+    status: l.status,
     thumbnail_url: thumb,
     last_updated_at: l.last_updated_at,
+    archive_warning_sent_at: l.archive_warning_sent_at,
+    archived_at: l.archived_at,
   };
 }
 
 router.get('/meta', (_req, res) => {
-  res.json({ part_categories: PART_CATEGORIES, cities: CITIES_SA, country: PHASE1_COUNTRY, currency: PHASE1_CURRENCY });
+  res.json({
+    countries: COUNTRIES.map((code) => ({
+      code,
+      label: COUNTRY_LABELS[code],
+      flag: COUNTRY_FLAGS[code],
+      currency: COUNTRY_CURRENCY[code],
+      phone_code: COUNTRY_PHONE_CODE[code],
+    })),
+    cities_by_country: COUNTRY_CITIES,
+    part_categories: PART_CATEGORIES,
+    vehicle_categories: Object.fromEntries(
+      VEHICLE_CATEGORIES.map((cat) => [
+        cat,
+        { label: VEHICLE_LABELS[cat], makes: VEHICLE_MAKES[cat], models_by_make: VEHICLE_MODELS_BY_MAKE[cat] },
+      ])
+    ),
+    report_reasons: { listing: REPORT_REASONS_LISTING, account: REPORT_REASONS_ACCOUNT },
+    commission_rate: COMMISSION_RATE,
+    bank_account: BANK_ACCOUNT,
+    bump_cooldown_hours: BUMP_COOLDOWN_HOURS,
+    archive_warning_days: ARCHIVE_WARNING_DAYS,
+    archive_days: ARCHIVE_DAYS,
+  });
 });
 
-// GET /api/listings?q=&part_category=&city=
+// GET /api/listings?category=&listing_type=&make=&model=&q=&part_category=&city=&country=
+// category defaults to 'spare_part' (the original car-parts browse/search screens
+// never sent a category param, so this keeps them working unchanged). country is
+// left unfiltered when omitted — cross-border search across the GCC is the point
+// (spec Section 1) — the client normally passes the user's browsing country.
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { q, part_category, city } = req.query;
-    const clauses = ["status = 'active'"];
-    const params = [];
+    const { q, part_category, city, category, listing_type, make, model, country } = req.query;
+    const effectiveCategory = category || 'spare_part';
+    const clauses = ["status = 'active'", `category = $1`];
+    const params = [effectiveCategory];
 
+    if (country) {
+      params.push(country);
+      clauses.push(`country = $${params.length}`);
+    }
+    if (listing_type) {
+      params.push(listing_type);
+      clauses.push(`listing_type = $${params.length}`);
+    }
+    if (make) {
+      params.push(make);
+      clauses.push(`compatible_make = $${params.length}`);
+    }
+    if (model) {
+      params.push(model);
+      clauses.push(`compatible_model = $${params.length}`);
+    }
     if (q) {
       params.push(`%${q}%`);
       clauses.push(`(title ILIKE $${params.length} OR description ILIKE $${params.length})`);
@@ -121,11 +195,14 @@ router.get(
         currency: withMedia.currency,
         city: withMedia.city,
         country: withMedia.country,
+        category: withMedia.category,
+        listing_type: withMedia.listing_type,
         part_category: withMedia.part_category,
         compatible_make: withMedia.compatible_make,
         compatible_model: withMedia.compatible_model,
         compatible_year_from: withMedia.compatible_year_from,
         compatible_year_to: withMedia.compatible_year_to,
+        damage_severity: withMedia.damage_severity,
         status: withMedia.status,
         last_updated_at: withMedia.last_updated_at,
         created_at: withMedia.created_at,
@@ -151,18 +228,97 @@ router.post(
   requireAuth,
   upload.array('images', MAX_IMAGES),
   asyncHandler(async (req, res) => {
-    const { title, description, price, city, part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to } =
-      req.body || {};
+    const {
+      title,
+      description,
+      price,
+      country,
+      city,
+      category,
+      listing_type,
+      part_category,
+      compatible_make,
+      compatible_model,
+      compatible_year_from,
+      compatible_year_to,
+      damage_severity,
+    } = req.body || {};
 
-    if (!title || !price || !city || !part_category) {
-      return res.status(400).json({ error: 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة' });
+    const effectiveCategory = category || 'spare_part';
+    if (!CATEGORIES.includes(effectiveCategory)) {
+      return res.status(400).json({ error: 'فئة إعلان غير صالحة' });
     }
-    if (!PART_CATEGORIES.includes(part_category)) {
-      return res.status(400).json({ error: 'فئة قطعة غير صالحة' });
+    if (!title || !price || !country || !city) {
+      return res.status(400).json({ error: 'عنوان الإعلان والسعر والدولة والمدينة مطلوبة' });
+    }
+    if (!COUNTRIES.includes(country)) {
+      return res.status(400).json({ error: 'دولة غير صالحة' });
+    }
+    if (!COUNTRY_CITIES[country].includes(city)) {
+      return res.status(400).json({ error: 'اختر مدينة ضمن الدولة المحددة' });
     }
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
       return res.status(400).json({ error: 'سعر غير صالح' });
+    }
+
+    // Per-account cap on total active listings (spec Section 15 — storage-abuse guard).
+    const activeCountRes = await pool.query(
+      "SELECT count(*)::int AS n FROM listings WHERE seller_id = $1 AND status = 'active'",
+      [req.userId]
+    );
+    if (activeCountRes.rows[0].n >= MAX_ACTIVE_LISTINGS_PER_ACCOUNT) {
+      return res.status(400).json({
+        error: `وصلت للحد الأقصى لعدد الإعلانات النشطة (${MAX_ACTIVE_LISTINGS_PER_ACCOUNT}) — احذف أو أرشف إعلاناً قديماً لإضافة جديد`,
+      });
+    }
+
+    let effectiveListingType = 'part';
+    let finalMake = compatible_make || null;
+    let finalModel = compatible_model || null;
+    let finalYearFrom = compatible_year_from ? Number(compatible_year_from) : null;
+    let finalYearTo = compatible_year_to ? Number(compatible_year_to) : null;
+    let finalPartCategory = part_category || null;
+    let finalDamageSeverity = null;
+
+    if (VEHICLE_CATEGORIES.includes(effectiveCategory)) {
+      if (!LISTING_TYPES.includes(listing_type)) {
+        return res.status(400).json({ error: 'نوع الإعلان (قطعة / مركبة كاملة) مطلوب' });
+      }
+      effectiveListingType = listing_type;
+
+      // The manufacturer (and model) grids are a selection convenience on the
+      // client; 'أخرى' there prompts the user for a custom name before ever
+      // calling this endpoint, so by the time a listing is created
+      // compatible_make/compatible_model are just normal free-text values —
+      // same as they already are for car parts (spare_part).
+      if (!compatible_make || !compatible_make.trim()) {
+        return res.status(400).json({ error: 'الشركة المصنّعة مطلوبة' });
+      }
+      finalMake = compatible_make.trim();
+
+      if (effectiveListingType === 'part') {
+        if (!finalPartCategory || !PART_CATEGORIES.includes(finalPartCategory)) {
+          return res.status(400).json({ error: 'فئة القطعة مطلوبة' });
+        }
+      } else {
+        // whole vehicle for sale: compatible_model/compatible_year_from store
+        // the vehicle's own model/year (not a "compatible with" reference).
+        if (!compatible_model || !compatible_year_from) {
+          return res.status(400).json({ error: 'الموديل وسنة الصنع مطلوبة' });
+        }
+        if (!damage_severity || !DAMAGE_LEVELS.includes(damage_severity)) {
+          return res.status(400).json({ error: 'درجة التلف مطلوبة' });
+        }
+        finalDamageSeverity = damage_severity;
+        finalPartCategory = null;
+        finalYearTo = null;
+      }
+    } else {
+      // spare_part (car parts) — original Phase 1 flow, unchanged.
+      if (!finalPartCategory || !PART_CATEGORIES.includes(finalPartCategory)) {
+        return res.status(400).json({ error: 'فئة قطعة غير صالحة' });
+      }
     }
 
     const client = await pool.connect();
@@ -170,23 +326,26 @@ router.post(
       await client.query('BEGIN');
       const result = await client.query(
         `INSERT INTO listings
-          (seller_id, category, title, description, country, city, price, currency,
-           part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to)
-         VALUES ($1,'spare_part',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          (seller_id, category, listing_type, title, description, country, city, price, currency,
+           part_category, compatible_make, compatible_model, compatible_year_from, compatible_year_to, damage_severity)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          RETURNING *`,
         [
           req.userId,
+          effectiveCategory,
+          effectiveListingType,
           title,
           description || null,
-          PHASE1_COUNTRY,
+          country,
           city,
           priceNum,
-          PHASE1_CURRENCY,
-          part_category,
-          compatible_make || null,
-          compatible_model || null,
-          compatible_year_from ? Number(compatible_year_from) : null,
-          compatible_year_to ? Number(compatible_year_to) : null,
+          COUNTRY_CURRENCY[country],
+          finalPartCategory,
+          finalMake,
+          finalModel,
+          finalYearFrom,
+          finalYearTo,
+          finalDamageSeverity,
         ]
       );
       const listing = result.rows[0];
@@ -210,6 +369,59 @@ router.post(
     } finally {
       client.release();
     }
+  })
+);
+
+// PATCH /api/listings/:id/bump — spec Section 8, the free daily "حدّث الآن"
+// mechanic (explicitly replaces any pay-to-promote feature at launch). The
+// 24h cooldown is re-validated server-side, never trusted from the client
+// button's disabled state.
+router.patch(
+  '/:id/bump',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id, status, last_updated_at FROM listings WHERE id = $1', [
+      req.params.id,
+    ]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+    if (listing.status !== 'active') return res.status(400).json({ error: 'لا يمكن تحديث إعلان غير نشط' });
+
+    const hoursSinceUpdate = (Date.now() - new Date(listing.last_updated_at).getTime()) / 3600000;
+    if (hoursSinceUpdate < BUMP_COOLDOWN_HOURS) {
+      return res.status(400).json({ error: `التحديث متاح بعد ${Math.ceil(BUMP_COOLDOWN_HOURS - hoursSinceUpdate)} س` });
+    }
+
+    const result = await pool.query(
+      `UPDATE listings SET last_updated_at = now(), archive_warning_sent_at = NULL
+       WHERE id = $1 RETURNING last_updated_at`,
+      [req.params.id]
+    );
+    res.json({ last_updated_at: result.rows[0].last_updated_at });
+  })
+);
+
+// PATCH /api/listings/:id/restore — spec Section 13/15: an archived listing
+// keeps a manual "استرجاع" (restore) action available until the hard-delete
+// sweep removes it permanently.
+router.patch(
+  '/:id/restore',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id, status FROM listings WHERE id = $1', [req.params.id]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+    if (listing.status !== 'archived') return res.status(400).json({ error: 'الإعلان غير مؤرشف' });
+
+    await pool.query(
+      `UPDATE listings
+       SET status = 'active', last_updated_at = now(), archived_at = NULL, archive_warning_sent_at = NULL
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
   })
 );
 
