@@ -138,3 +138,34 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE INDEX IF NOT EXISTS idx_transactions_seller ON transactions (seller_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_buyer ON transactions (buyer_id);
+
+-- In-app messaging: simple text-only conversations, no real-time delivery
+-- (loads fresh on screen open/refresh), no images, no message deletion.
+-- One conversation per (listing, buyer) pair — always tied to the specific
+-- listing it was started from, even if the same two users also transact on
+-- a different listing (that gets its own separate conversation). seller_id
+-- is denormalized from listings.seller_id at creation time so authorization
+-- checks never need an extra join back to listings.
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  last_message_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (buyer_id != seller_id),
+  UNIQUE (listing_id, buyer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_buyer ON conversations (buyer_id, last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_seller ON conversations (seller_id, last_message_at DESC);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, created_at ASC);

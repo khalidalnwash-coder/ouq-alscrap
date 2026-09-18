@@ -253,3 +253,19 @@ button:active{ transform:translateY(1px); }
 /* Per-card actions on "إعلاناتي" (My Listings): bump / restore — Section 8 & 15 */
 .card-action-btn{ width:100%; border:1px solid var(--border); margin-top:6px; padding:7px; font-size:var(--fs-xs); }
 .card-action-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+/* In-app messaging: conversation list rows + chat bubbles */
+.convo-row{
+  display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:13px; margin-bottom:10px; cursor:pointer; box-shadow:var(--shadow-sm);
+  transition:box-shadow .15s ease;
+}
+.convo-row:hover{ box-shadow:var(--shadow-md); }
+
+.msg-bubble{
+  max-width:78%; padding:10px 13px; border-radius:var(--radius); font-size:var(--fs-base); line-height:1.6;
+  position:relative; word-break:break-word; white-space:pre-wrap;
+}
+.msg-theirs{ align-self:flex-start; background:var(--card); border:1px solid var(--border); border-bottom-left-radius:4px; }
+.msg-mine{ align-self:flex-end; background:var(--blue); color:#fff; border-bottom-right-radius:4px; }
+.msg-time{ display:block; font-size:9.5px; margin-top:4px; opacity:.65; text-align:left; }
