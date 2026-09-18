@@ -455,6 +455,28 @@
     <div class="listing-grid" id="my-listings"></div>
   </div>
 
+  <!-- ================= MESSAGES (conversation list) ================= -->
+  <div class="screen" id="screen-messages">
+    <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الرسائل</h2></div>
+    <div id="messages-list"></div>
+  </div>
+
+  <!-- ================= CHAT (single conversation) ================= -->
+  <div class="screen" id="screen-chat">
+    <div class="topbar">
+      <span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span>
+      <div style="flex:1; min-width:0;">
+        <h2 id="chat-peer-name" style="font-size:var(--fs-md); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></h2>
+        <p class="muted link" id="chat-listing-title" style="font-size:var(--fs-xs); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" onclick="openDetail(currentChatListingId)"></p>
+      </div>
+    </div>
+    <div id="chat-messages" style="display:flex; flex-direction:column; gap:8px; margin-bottom:80px;"></div>
+    <div style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:440px; background:var(--card); border-top:1px solid var(--border); padding:10px 16px; display:flex; gap:8px; z-index:60;">
+      <input id="chat-input" placeholder="اكتب رسالة..." style="margin-bottom:0;" maxlength="2000">
+      <button class="btn-primary" style="width:auto; padding:11px 16px;" onclick="sendChatMessage()"><i data-lucide="send" class="icon icon-sm"></i></button>
+    </div>
+  </div>
+
   <!-- ================= SUPPORT ================= -->
   <div class="screen" id="screen-support">
     <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الدعم الفني</h2></div>
@@ -486,7 +508,7 @@
     <div class="nav-item" data-nav="home" onclick="go('home')"><i data-lucide="home" class="icon"></i><span>الرئيسية</span></div>
     <div class="nav-item" data-nav="search" onclick="go('search')"><i data-lucide="search" class="icon"></i><span>البحث</span></div>
     <div class="fab" onclick="openCarPartCreate()"><i data-lucide="plus" class="icon"></i></div>
-    <div class="nav-item" onclick="toast('الرسائل تتوفر في مرحلة لاحقة — استخدم زر تواصل مع البائع')"><i data-lucide="message-circle" class="icon"></i><span>الرسائل</span></div>
+    <div class="nav-item" data-nav="messages" onclick="requireAuthThen('messages')"><i data-lucide="message-circle" class="icon"></i><span>الرسائل</span></div>
     <div class="nav-item" data-nav="profile" onclick="requireAuthThen('profile')"><i data-lucide="user" class="icon"></i><span>حسابي</span></div>
   </div>
 

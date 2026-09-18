@@ -9,6 +9,7 @@ const usersRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const reportsRoutes = require('./routes/reports');
 const transactionsRoutes = require('./routes/transactions');
+const conversationsRoutes = require('./routes/conversations');
 const { uploadsDir } = require('./utils/storage');
 const { runArchivalSweep } = require('./jobs/archival');
 
@@ -25,6 +26,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/transactions', transactionsRoutes);
+app.use('/api/conversations', conversationsRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

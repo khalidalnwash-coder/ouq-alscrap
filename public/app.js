@@ -60,7 +60,7 @@ function go(id) {
   document.getElementById('screen-' + id).classList.add('active');
   history_.push(id);
 
-  const navScreens = ['home', 'search', 'create', 'profile'];
+  const navScreens = ['home', 'search', 'create', 'profile', 'messages'];
   document.getElementById('navbar').style.display = navScreens.includes(id) ? 'flex' : 'none';
   document.querySelectorAll('.nav-item[data-nav]').forEach((el) => {
     el.classList.toggle('active', el.dataset.nav === id);
@@ -75,6 +75,7 @@ function go(id) {
   if (id === 'vehicle-makes') renderVehicleMakes();
   if (id === 'vehicle-parts') renderVehicleParts();
   if (id === 'vehicle-whole') renderVehicleWhole();
+  if (id === 'messages') renderMessagesList();
   window.scrollTo(0, 0);
 }
 function goBack() {
@@ -703,12 +704,11 @@ async function openDetail(id) {
       <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-bottom:12px; gap:8px;">
         <span style="font-size:var(--fs-xl); font-weight:700; color:var(--blue);">${formatPrice(listing.price, listing.currency)}</span>
         <div style="display:flex; align-items:center; gap:8px;">
-          <button class="btn-primary" style="width:auto; padding:11px 20px;" onclick="contactSeller('${seller.id}')">تواصل مع البائع</button>
+          <button class="btn-primary" style="width:auto; padding:11px 20px;" ${isOwnListing ? 'disabled' : ''} onclick="openConversationFromListing()">تواصل مع البائع</button>
           <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px;" title="إبلاغ عن الإعلان" onclick="openReportListing()">${icon('flag', 'icon-sm')}</button>
         </div>
       </div>
       ${!isOwnListing ? `<button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد العمولة</button>` : ''}
-      <div id="contact-reveal"></div>
     `;
     refreshIcons();
   } catch (err) {
@@ -718,27 +718,6 @@ async function openDetail(id) {
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/);
   return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
-}
-async function contactSeller(sellerId) {
-  if (!currentUser) {
-    toast('سجّل الدخول للتواصل مع البائع');
-    return go('login');
-  }
-  try {
-    const res = await api('/users/' + sellerId + '/contact');
-    const waLink = `https://wa.me/${res.phone.replace('+', '')}`;
-    document.getElementById('contact-reveal').innerHTML = `
-      <div class="pledge-box" style="margin-top:10px;">
-        ${icon('phone', 'icon-sm icon-top-align')}
-        <p style="font-size:var(--fs-base); line-height:1.9;">
-          <b>${res.phone}</b><br>
-          ${res.whatsapp_verified ? `<a href="${waLink}" target="_blank" class="link">تواصل عبر واتساب</a>` : 'راسل البائع أو اتصل به مباشرة'}
-        </p>
-      </div>`;
-    refreshIcons();
-  } catch (err) {
-    toast(err.message);
-  }
 }
 
 // ---------- reporting (listings & accounts) — spec Section 10 ----------
@@ -849,6 +828,120 @@ async function confirmDeal() {
     btn.textContent = 'تم التحويل، تأكيد التسديد';
   }
 }
+
+// ---------- messaging (simple in-app chat, no real-time / images / delete) ----------
+let currentChatId = null;
+let currentChatListingId = null;
+
+async function openConversationFromListing() {
+  if (!currentUser) { toast('سجّل الدخول للتواصل مع البائع'); return go('login'); }
+  if (!currentListingDetail) return;
+  try {
+    const res = await api('/conversations', { method: 'POST', body: { listing_id: currentListingDetail.id } });
+    openChat(res.conversation_id);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function timeAgoShort(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'الآن';
+  if (mins < 60) return `${mins} د`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} س`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} يوم`;
+  return new Date(iso).toLocaleDateString('ar');
+}
+
+async function renderMessagesList() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  const el = document.getElementById('messages-list');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  try {
+    const { conversations } = await api('/conversations');
+    el.innerHTML = conversations.length
+      ? conversations.map((c) => `
+        <div class="convo-row" onclick="openChat('${c.id}')">
+          <div class="avatar">${initials(c.peer_name)}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:6px;">
+              <span style="font-weight:700; font-size:var(--fs-base); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.peer_name)}</span>
+              <span class="muted" style="font-size:var(--fs-xs); flex-shrink:0;">${timeAgoShort(c.last_message_at)}</span>
+            </div>
+            <p class="muted" style="font-size:var(--fs-xs); margin:2px 0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.listing_title)}</p>
+            <p style="font-size:var(--fs-sm); color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${c.last_message_body ? (c.last_message_is_mine ? 'أنت: ' : '') + escapeHtml(c.last_message_body) : '<span class="muted">لا توجد رسائل بعد</span>'}
+            </p>
+          </div>
+        </div>`).join('')
+      : '<p class="muted center" style="padding:32px 0;">لا توجد محادثات بعد — ابدأ من زر "تواصل مع البائع" في أي إعلان</p>';
+    refreshIcons();
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل الرسائل: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function openChat(conversationId) {
+  currentChatId = conversationId;
+  go('chat');
+  const el = document.getElementById('chat-messages');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  document.getElementById('chat-peer-name').textContent = '';
+  document.getElementById('chat-listing-title').textContent = '';
+  try {
+    const { conversation, messages } = await api('/conversations/' + conversationId + '/messages');
+    currentChatListingId = conversation.listing_id;
+    document.getElementById('chat-peer-name').textContent = conversation.peer_name;
+    document.getElementById('chat-listing-title').textContent = conversation.listing_title;
+    renderChatMessages(messages);
+    document.getElementById('chat-input').value = '';
+    document.getElementById('chat-input').focus();
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل المحادثة: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderChatMessages(messages) {
+  const el = document.getElementById('chat-messages');
+  el.innerHTML = messages.length
+    ? messages.map((m) => {
+        const mine = m.sender_id === currentUser.id;
+        return `<div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
+          ${escapeHtml(m.body)}
+          <span class="msg-time">${new Date(m.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>`;
+      }).join('')
+    : '<p class="muted center" style="padding:24px 0;">ابدأ المحادثة بكتابة أول رسالة</p>';
+  refreshIcons();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const body = input.value.trim();
+  if (!body || !currentChatId) return;
+  input.disabled = true;
+  try {
+    await api('/conversations/' + currentChatId + '/messages', { method: 'POST', body: { body } });
+    input.value = '';
+    const { messages } = await api('/conversations/' + currentChatId + '/messages');
+    renderChatMessages(messages);
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target && e.target.id === 'chat-input') {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
 
 // ---------- create listing ----------
 function prepareCreateScreen() {
