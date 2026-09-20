@@ -184,6 +184,22 @@ const CURRENCY_LABELS_AR = {
   QAR: 'ريال قطري', BHD: 'دينار بحريني', OMR: 'ريال عماني',
 };
 
+// Year-of-manufacture pickers (create-listing form) — a select, not free
+// text, so the value is always a real valid year. Newest first; 1980 covers
+// the oldest wrecks/parts realistically listed.
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_LISTING_YEAR = 1980;
+function yearOptionsHtml(selectedValue, { required = false } = {}) {
+  const placeholder = required
+    ? '<option value="" disabled selected>اختر السنة</option>'
+    : '<option value="">— اختياري —</option>';
+  let html = placeholder;
+  for (let y = CURRENT_YEAR + 1; y >= MIN_LISTING_YEAR; y--) {
+    html += `<option value="${y}" ${String(y) === String(selectedValue) ? 'selected' : ''}>${y}</option>`;
+  }
+  return html;
+}
+
 function populateMetaSelects() {
   document.getElementById('su-country').innerHTML = countryOptionsHtml(browsingCountry);
   document.getElementById('su-code').innerHTML = phoneCodeOptionsHtml(countryInfo(browsingCountry)?.phone_code);
@@ -954,12 +970,12 @@ function prepareCreateScreen() {
   document.getElementById('cl-price').value = '';
   document.getElementById('cl-make').value = '';
   document.getElementById('cl-model').value = '';
-  document.getElementById('cl-year-from').value = '';
-  document.getElementById('cl-year-to').value = '';
-  document.getElementById('cl-vehicle-part-year-from').value = '';
-  document.getElementById('cl-vehicle-part-year-to').value = '';
+  document.getElementById('cl-year-from').innerHTML = yearOptionsHtml();
+  document.getElementById('cl-year-to').innerHTML = yearOptionsHtml();
+  document.getElementById('cl-vehicle-part-year-from').innerHTML = yearOptionsHtml();
+  document.getElementById('cl-vehicle-part-year-to').innerHTML = yearOptionsHtml();
   document.getElementById('cl-vehicle-part-model-other').value = '';
-  document.getElementById('cl-vehicle-whole-year').value = '';
+  document.getElementById('cl-vehicle-whole-year').innerHTML = yearOptionsHtml(null, { required: true });
   document.getElementById('cl-vehicle-whole-damage').value = 'light';
   document.getElementById('cl-vehicle-whole-model-other').value = '';
   document.getElementById('cl-country').value = browsingCountry;

@@ -305,8 +305,8 @@
           <div><input id="cl-model" placeholder="الموديل"></div>
         </div>
         <div class="row2">
-          <div><input id="cl-year-from" type="number" placeholder="من سنة"></div>
-          <div><input id="cl-year-to" type="number" placeholder="إلى سنة"></div>
+          <div><select id="cl-year-from"></select></div>
+          <div><select id="cl-year-to"></select></div>
         </div>
       </div>
 
@@ -318,8 +318,8 @@
         <input id="cl-vehicle-part-model-other" placeholder="اكتب اسم الموديل" style="display:none;">
         <label>مطابقة سنة (اختياري)</label>
         <div class="row2">
-          <div><input id="cl-vehicle-part-year-from" type="number" placeholder="من سنة"></div>
-          <div><input id="cl-vehicle-part-year-to" type="number" placeholder="إلى سنة"></div>
+          <div><select id="cl-vehicle-part-year-from"></select></div>
+          <div><select id="cl-vehicle-part-year-to"></select></div>
         </div>
       </div>
 
@@ -330,7 +330,7 @@
         <select id="cl-vehicle-whole-model" onchange="onVehicleModelChange('whole')"></select>
         <input id="cl-vehicle-whole-model-other" placeholder="اكتب اسم الموديل" style="display:none;">
         <div class="row2">
-          <div><label>سنة الصنع</label><input id="cl-vehicle-whole-year" type="number" placeholder="2020"></div>
+          <div><label>سنة الصنع</label><select id="cl-vehicle-whole-year"></select></div>
           <div><label>درجة التلف</label>
             <select id="cl-vehicle-whole-damage">
               <option value="light">خفيف</option>
