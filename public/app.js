@@ -15,9 +15,11 @@ let currentListingId = null;
 let selectedImages = []; // File[] for create-listing
 
 // "Vehicle sections" — motorcycles / full cars / trucks, all sharing the
-// same screens (screen-vehicle-makes/choice/parts/whole), driven by
-// vehicleCategory. Unrelated to the plain, manufacturer-optional "قطع غيار"
-// (spare_part) flow, which stays exactly as it was.
+// same screens (screen-vehicle-makes/browse), driven by vehicleCategory.
+// screen-vehicle-browse has two tabs ("قطع غيار" | "[نوع] كاملة") that swap
+// content in place — no separate choice screen or back-navigation between
+// them. Unrelated to the plain, manufacturer-optional "قطع غيار" (spare_part)
+// flow reachable from the home search bar, which stays exactly as it was.
 let vehicleCategory = null; // 'motorcycle' | 'full_car' | 'truck'
 let vehicleContext = { make: null };
 let selectedVehiclePartCategory = '';
@@ -73,8 +75,7 @@ function go(id) {
   if (id === 'admin') renderAdmin();
   if (id === 'my-listings') renderMyListings();
   if (id === 'vehicle-makes') renderVehicleMakes();
-  if (id === 'vehicle-parts') renderVehicleParts();
-  if (id === 'vehicle-whole') renderVehicleWhole();
+  if (id === 'vehicle-browse') renderVehicleBrowse();
   if (id === 'messages') renderMessagesList();
   window.scrollTo(0, 0);
 }
@@ -551,29 +552,31 @@ function confirmVehicleOtherMake() {
 }
 function proceedWithVehicleMake(make) {
   vehicleContext.make = make;
-  const plural = VEHICLE_PLURALS[vehicleCategory];
-  document.getElementById('vehicle-choice-title').textContent = plural + ' ' + make;
-  document.getElementById('vehicle-choice-make-1').textContent = make;
-  document.getElementById('vehicle-choice-whole-icon').innerHTML = icon(VEHICLE_ICONS[vehicleCategory]);
-  document.getElementById('vehicle-choice-whole-label').innerHTML =
-    `${plural} <span id="vehicle-choice-make-2">${escapeHtml(make)}</span> كاملة تالفة`;
-  refreshIcons();
-  go('vehicle-choice');
+  vehicleTab = 'part';
+  go('vehicle-browse');
 }
-function openVehicleParts() {
-  document.getElementById('vehicle-parts-make').textContent = vehicleContext.make;
+// One screen, two tabs ("قطع غيار" | "[نوع] كاملة") — switching just toggles
+// which content block is visible and (re)loads its listings; no navigation.
+let vehicleTab = 'part'; // 'part' | 'whole'
+function renderVehicleBrowse() {
+  const plural = VEHICLE_PLURALS[vehicleCategory];
+  const make = vehicleContext.make;
+  document.getElementById('vehicle-browse-title').textContent = plural + ' ' + make;
+  document.getElementById('vtab-btn-whole').textContent = plural + ' كاملة';
+  document.getElementById('vehicle-whole-create-link').textContent = '+ نشر ' + currentVehicleMeta().label + ' للبيع';
   selectedVehiclePartCategory = '';
   selectedVehiclePartsModel = '';
-  document.getElementById('vehicle-parts-q').value = '';
-  go('vehicle-parts');
-}
-function openVehicleWhole() {
-  const plural = VEHICLE_PLURALS[vehicleCategory];
-  document.getElementById('vehicle-whole-heading').innerHTML =
-    `${plural} <span id="vehicle-whole-make">${escapeHtml(vehicleContext.make)}</span> تالفة`;
-  document.getElementById('vehicle-whole-create-link').textContent = '+ نشر ' + currentVehicleMeta().label + ' للبيع';
   selectedVehicleWholeModel = '';
-  go('vehicle-whole');
+  document.getElementById('vehicle-parts-q').value = '';
+  switchVehicleTab(vehicleTab);
+}
+function switchVehicleTab(tab) {
+  vehicleTab = tab;
+  document.getElementById('vtab-btn-part').classList.toggle('active', tab === 'part');
+  document.getElementById('vtab-btn-whole').classList.toggle('active', tab === 'whole');
+  document.getElementById('vehicle-tab-part').style.display = tab === 'part' ? 'block' : 'none';
+  document.getElementById('vehicle-tab-whole').style.display = tab === 'whole' ? 'block' : 'none';
+  if (tab === 'part') renderVehicleParts(); else renderVehicleWhole();
 }
 function populateModelFilter(selectId, selectedValue) {
   const models = (currentVehicleMeta().models_by_make[vehicleContext.make] || []).filter((m) => m !== 'أخرى');
@@ -976,7 +979,7 @@ function prepareCreateScreen() {
     const isWhole = createMode === 'vehicle_whole';
     const label = (meta.vehicle_categories[createVehicleCategory] || {}).label || '';
     heading.textContent = isWhole ? `إضافة ${label} تالفة للبيع` : `إضافة قطعة غيار ${label}`;
-    backBtn.onclick = () => go(isWhole ? 'vehicle-whole' : 'vehicle-parts');
+    backBtn.onclick = () => { vehicleTab = isWhole ? 'whole' : 'part'; go('vehicle-browse'); };
     const makeDisplayId = isWhole ? 'cl-vehicle-whole-make-display' : 'cl-vehicle-part-make-display';
     document.getElementById(makeDisplayId).innerHTML = icon(VEHICLE_ICONS[createVehicleCategory], 'icon-sm icon-muted') + ' ' + escapeHtml(createVehicleMake);
     refreshIcons();
@@ -1093,8 +1096,8 @@ async function publishListing() {
   try {
     await api('/listings', { method: 'POST', body: fd, isForm: true });
     toast('تم نشر الإعلان بنجاح');
-    if (createMode === 'vehicle_part') go('vehicle-parts');
-    else if (createMode === 'vehicle_whole') go('vehicle-whole');
+    if (createMode === 'vehicle_part') { vehicleTab = 'part'; go('vehicle-browse'); }
+    else if (createMode === 'vehicle_whole') { vehicleTab = 'whole'; go('vehicle-browse'); }
     else go('home');
   } catch (err) {
     showError('cl-error', err.message);
