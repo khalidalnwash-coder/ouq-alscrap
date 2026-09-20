@@ -219,6 +219,7 @@
     <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع الغيار</h2></div>
     <select id="search-country" onchange="onBrowsingCountryChange(this.value)" style="margin-bottom:14px;"></select>
     <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="search-q" placeholder="ابحث في قطع الغيار" oninput="debouncedSearch()"></div>
+    <select id="search-year-filter" onchange="renderSearch()" style="margin-bottom:12px;"></select>
     <div class="cat-strip" id="cat-strip"></div>
     <div id="search-header" style="display:flex; justify-content:space-between; margin-bottom:12px;">
       <span style="font-size:var(--fs-sm); font-weight:700;">إعلانات: <span id="cat-name">الكل</span></span>
@@ -254,7 +255,10 @@
 
     <div id="vehicle-tab-part">
       <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="vehicle-parts-q" placeholder="ابحث في القطع" oninput="debouncedVehiclePartsSearch()"></div>
-      <select id="vehicle-parts-model-filter" onchange="renderVehicleParts()" style="margin-bottom:12px;"></select>
+      <div class="row2">
+        <div><select id="vehicle-parts-model-filter" onchange="renderVehicleParts()"></select></div>
+        <div><select id="vehicle-parts-year-filter" onchange="renderVehicleParts()"></select></div>
+      </div>
       <div class="cat-strip" id="vehicle-parts-cat-strip"></div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <span class="muted" id="vehicle-parts-count">— </span>
@@ -264,7 +268,10 @@
     </div>
 
     <div id="vehicle-tab-whole" style="display:none;">
-      <select id="vehicle-whole-model-filter" onchange="renderVehicleWhole()" style="margin-bottom:12px;"></select>
+      <div class="row2">
+        <div><select id="vehicle-whole-model-filter" onchange="renderVehicleWhole()"></select></div>
+        <div><select id="vehicle-whole-year-filter" onchange="renderVehicleWhole()"></select></div>
+      </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <span class="muted" id="vehicle-whole-count">— </span>
         <span class="link" style="font-size:var(--fs-sm);" id="vehicle-whole-create-link" onclick="openVehicleCreateWhole()">+ نشر للبيع</span>

@@ -10,6 +10,7 @@ let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_
 const COUNTRY_KEY = 'alscrap_country';
 let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
+let selectedSearchYear = '';
 let searchDebounceTimer = null;
 let currentListingId = null;
 let selectedImages = []; // File[] for create-listing
@@ -26,6 +27,8 @@ let selectedVehiclePartCategory = '';
 let vehiclePartsDebounceTimer = null;
 let selectedVehiclePartsModel = '';
 let selectedVehicleWholeModel = '';
+let selectedVehiclePartsYear = '';
+let selectedVehicleWholeYear = '';
 let createMode = 'car_part'; // 'car_part' | 'vehicle_part' | 'vehicle_whole' — which shape screen-create renders
 let createVehicleCategory = null;
 let createVehicleMake = null;
@@ -198,6 +201,19 @@ function yearOptionsHtml(selectedValue, { required = false } = {}) {
     html += `<option value="${y}" ${String(y) === String(selectedValue) ? 'selected' : ''}>${y}</option>`;
   }
   return html;
+}
+// Same year range, but as a search/browse filter ("كل السنوات" instead of
+// an "اختياري" placeholder) — used on the search and vehicle-section
+// browse screens so customers can narrow results by year of manufacture.
+function yearFilterOptionsHtml(selectedValue) {
+  let html = `<option value="">كل السنوات</option>`;
+  for (let y = CURRENT_YEAR + 1; y >= MIN_LISTING_YEAR; y--) {
+    html += `<option value="${y}" ${String(y) === String(selectedValue) ? 'selected' : ''}>${y}</option>`;
+  }
+  return html;
+}
+function populateYearFilter(selectId, selectedValue) {
+  document.getElementById(selectId).innerHTML = yearFilterOptionsHtml(selectedValue);
 }
 
 function populateMetaSelects() {
@@ -489,6 +505,7 @@ function homeSearch() {
   go('search');
   document.getElementById('search-q').value = q;
   selectedPartCategory = '';
+  selectedSearchYear = '';
   renderSearch();
 }
 
@@ -513,9 +530,12 @@ async function renderSearch() {
   renderCatStrip();
   document.getElementById('cat-name').textContent = selectedPartCategory || 'الكل';
   const q = document.getElementById('search-q').value.trim();
+  selectedSearchYear = document.getElementById('search-year-filter').value;
+  populateYearFilter('search-year-filter', selectedSearchYear);
   const params = new URLSearchParams({ country: browsingCountry });
   if (q) params.set('q', q);
   if (selectedPartCategory) params.set('part_category', selectedPartCategory);
+  if (selectedSearchYear) params.set('year', selectedSearchYear);
 
   const el = document.getElementById('search-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
@@ -583,6 +603,8 @@ function renderVehicleBrowse() {
   selectedVehiclePartCategory = '';
   selectedVehiclePartsModel = '';
   selectedVehicleWholeModel = '';
+  selectedVehiclePartsYear = '';
+  selectedVehicleWholeYear = '';
   document.getElementById('vehicle-parts-q').value = '';
   switchVehicleTab(vehicleTab);
 }
@@ -619,11 +641,14 @@ async function renderVehicleParts() {
   renderVehiclePartsCatStrip();
   selectedVehiclePartsModel = document.getElementById('vehicle-parts-model-filter').value;
   populateModelFilter('vehicle-parts-model-filter', selectedVehiclePartsModel);
+  selectedVehiclePartsYear = document.getElementById('vehicle-parts-year-filter').value;
+  populateYearFilter('vehicle-parts-year-filter', selectedVehiclePartsYear);
   const q = document.getElementById('vehicle-parts-q').value.trim();
   const params = new URLSearchParams({ category: vehicleCategory, listing_type: 'part', make: vehicleContext.make, country: browsingCountry });
   if (q) params.set('q', q);
   if (selectedVehiclePartCategory) params.set('part_category', selectedVehiclePartCategory);
   if (selectedVehiclePartsModel) params.set('model', selectedVehiclePartsModel);
+  if (selectedVehiclePartsYear) params.set('year', selectedVehiclePartsYear);
 
   const el = document.getElementById('vehicle-parts-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
@@ -639,8 +664,11 @@ async function renderVehicleParts() {
 async function renderVehicleWhole() {
   selectedVehicleWholeModel = document.getElementById('vehicle-whole-model-filter').value;
   populateModelFilter('vehicle-whole-model-filter', selectedVehicleWholeModel);
+  selectedVehicleWholeYear = document.getElementById('vehicle-whole-year-filter').value;
+  populateYearFilter('vehicle-whole-year-filter', selectedVehicleWholeYear);
   const params = new URLSearchParams({ category: vehicleCategory, listing_type: 'whole', make: vehicleContext.make, country: browsingCountry });
   if (selectedVehicleWholeModel) params.set('model', selectedVehicleWholeModel);
+  if (selectedVehicleWholeYear) params.set('year', selectedVehicleWholeYear);
 
   const el = document.getElementById('vehicle-whole-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';

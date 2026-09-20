@@ -108,7 +108,7 @@ router.get('/meta', (_req, res) => {
   });
 });
 
-// GET /api/listings?category=&listing_type=&make=&model=&q=&part_category=&city=&country=
+// GET /api/listings?category=&listing_type=&make=&model=&q=&part_category=&city=&country=&year=
 // category defaults to 'spare_part' (the original car-parts browse/search screens
 // never sent a category param, so this keeps them working unchanged). country is
 // left unfiltered when omitted — cross-border search across the GCC is the point
@@ -116,7 +116,7 @@ router.get('/meta', (_req, res) => {
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { q, part_category, city, category, listing_type, make, model, country } = req.query;
+    const { q, part_category, city, category, listing_type, make, model, country, year } = req.query;
     const effectiveCategory = category || 'spare_part';
     const clauses = ["status = 'active'", `category = $1`];
     const params = [effectiveCategory];
@@ -148,6 +148,22 @@ router.get(
     if (city) {
       params.push(city);
       clauses.push(`city = $${params.length}`);
+    }
+    // Year-of-manufacture search filter. Whole-vehicle listings store their
+    // own year in compatible_year_from (exact match); spare-part listings
+    // use compatible_year_from/to as an optional compatibility range where
+    // an unset bound means "unbounded" — a part with no year specified is
+    // treated as fitting any year, matching how it's presented at listing
+    // time ("مطابقة سنة (اختياري)").
+    const yearNum = Number(year);
+    if (year && Number.isInteger(yearNum)) {
+      params.push(yearNum);
+      const yIdx = params.length;
+      clauses.push(
+        `((listing_type = 'whole' AND compatible_year_from = $${yIdx}) OR ` +
+        `(listing_type = 'part' AND (compatible_year_from IS NULL OR compatible_year_from <= $${yIdx}) ` +
+        `AND (compatible_year_to IS NULL OR compatible_year_to >= $${yIdx})))`
+      );
     }
 
     const sql = `SELECT * FROM listings WHERE ${clauses.join(' AND ')} ORDER BY last_updated_at DESC LIMIT 60`;
