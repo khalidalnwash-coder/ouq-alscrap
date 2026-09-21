@@ -210,6 +210,7 @@
       <div class="cat-card" onclick="openVehicleSection('truck')"><i data-lucide="truck" class="icon"></i>شاحنات وتريلات</div>
       <div class="cat-card" onclick="openVehicleSection('motorcycle')"><i data-lucide="bike" class="icon"></i>دراجات نارية</div>
     </div>
+    <button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:20px;" onclick="openDealConfirmStandalone()"><i data-lucide="handshake" class="icon icon-sm"></i> تأكيد صفقة وتسديد عمولة</button>
     <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">أحدث الإعلانات</h3>
     <div class="listing-grid" id="home-listings"></div>
   </div>
@@ -433,6 +434,7 @@
         <div><p style="font-size:var(--fs-base); font-weight:700;" id="profile-name"></p><p class="muted" id="profile-email"></p></div>
       </div>
       <div class="settings-row" onclick="go('my-listings')"><i data-lucide="list" class="icon"></i><span>إعلاناتي</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="openDealConfirmStandalone()"><i data-lucide="handshake" class="icon"></i><span>تأكيد صفقة وتسديد عمولة</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toast('قريباً')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toggleNotifRow()"><i data-lucide="bell" class="icon"></i><span>الإشعارات: <b id="notif-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>

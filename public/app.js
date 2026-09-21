@@ -824,13 +824,27 @@ async function submitReport() {
 }
 
 // ---------- deal confirmation & commission settlement — spec Section 11 ----------
+// Reachable three ways: the "تأكيد الصفقة" button on a listing (tied to
+// that listing/seller, dealContext.listingId set), or directly from the
+// home screen / account settings with no listing context at all — a deal
+// made entirely outside the app can still be confirmed here (product
+// decision: no mandatory listing link). The screen itself is identical
+// either way; only what gets sent to the API on submit differs.
 let dealContext = null;
 function openDealConfirm() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
   if (!currentListingDetail || !currentSellerDetail) return;
   dealContext = { listingId: currentListingDetail.id, currency: currentListingDetail.currency };
+  prepareDealConfirmScreen(dealContext.currency);
+}
+function openDealConfirmStandalone() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  dealContext = { listingId: null, currency: (countryInfo(browsingCountry) && countryInfo(browsingCountry).currency) || 'SAR' };
+  prepareDealConfirmScreen(dealContext.currency);
+}
+function prepareDealConfirmScreen(defaultCurrency) {
   document.getElementById('dc-currency').innerHTML = Object.keys(CURRENCY_LABELS_AR)
-    .map((c) => `<option value="${c}" ${c === dealContext.currency ? 'selected' : ''}>${CURRENCY_LABELS_AR[c]} (${c})</option>`)
+    .map((c) => `<option value="${c}" ${c === defaultCurrency ? 'selected' : ''}>${CURRENCY_LABELS_AR[c]} (${c})</option>`)
     .join('');
   document.getElementById('dc-amount').value = '';
   document.getElementById('dc-rate-display').textContent = ((meta.commission_rate || 0.025) * 100).toFixed(1) + '%';
@@ -865,7 +879,9 @@ async function confirmDeal() {
   btn.disabled = true;
   btn.textContent = 'جارِ التأكيد...';
   try {
-    await api('/transactions', { method: 'POST', body: { listing_id: dealContext.listingId, deal_amount: amount, currency } });
+    const body = { deal_amount: amount, currency };
+    if (dealContext.listingId) body.listing_id = dealContext.listingId;
+    await api('/transactions', { method: 'POST', body });
     toast('تم تأكيد تسديد العمولة، شكراً لأمانتك');
     goBack();
   } catch (err) {
