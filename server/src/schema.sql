@@ -123,10 +123,20 @@ CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports (status, create
 -- the transfer, so commission_status is a pure self-attestation set to
 -- 'user_confirmed_paid' the moment the user taps the single confirm button
 -- (there is no separate "create pending, then confirm" step in the UI).
+--
+-- listing_id/buyer_id are nullable: this screen is also reachable directly
+-- from the home screen and account settings (no listing context at all —
+-- product decision is that a deal made entirely outside the app, with no
+-- in-app listing or chat, can still be confirmed here). When reached from
+-- a listing's "تأكيد الصفقة" button, listing_id/buyer_id are set as before
+-- (buyer_id = the confirming user, seller_id = the listing's seller);
+-- otherwise seller_id is just the confirming user and listing_id/buyer_id
+-- stay null. seller_id is kept NOT NULL as "who is responsible for paying
+-- the commission", which is always known regardless of entry point.
 CREATE TABLE IF NOT EXISTS transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
-  buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES listings(id) ON DELETE CASCADE,
+  buyer_id UUID REFERENCES users(id) ON DELETE CASCADE,
   seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   deal_amount NUMERIC(12,2) NOT NULL,
   currency TEXT NOT NULL CHECK (currency IN ('SAR','AED','KWD','QAR','BHD','OMR')),
@@ -135,6 +145,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   confirmed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent upgrade path for a transactions table created before
+-- listing_id/buyer_id became optional.
+ALTER TABLE transactions ALTER COLUMN listing_id DROP NOT NULL;
+ALTER TABLE transactions ALTER COLUMN buyer_id DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_transactions_seller ON transactions (seller_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_buyer ON transactions (buyer_id);
