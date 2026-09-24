@@ -270,15 +270,13 @@ const REPORT_REASONS_ACCOUNT = [
 // ---------------------------------------------------------------------------
 // Transaction confirmation & commission settlement (spec Section 11).
 // COMMISSION_RATE is the pledged 2.5% from Section 9's commitment text.
-// BANK_ACCOUNT is EXPLICITLY placeholder/test data per product owner
-// direction — must be replaced with the real project bank account before
-// public launch. Not the business's own account yet, so no QR/instant-
-// transfer network branding either (deferred per spec Section 11).
+// BANK_ACCOUNT is the real project account (confirmed by product owner).
+// No QR/instant-transfer network branding yet (deferred per spec Section 11).
 const COMMISSION_RATE = 0.025;
 const BANK_ACCOUNT = {
   bank_name: 'مصرف الراجحي',
-  iban: 'SA00 0000 0000 0000 0000 00',
-  is_placeholder: true,
+  iban: 'SA74 8000 0296 6080 1634 2563',
+  is_placeholder: false,
 };
 
 // ---------------------------------------------------------------------------
