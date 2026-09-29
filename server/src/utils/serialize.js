@@ -13,6 +13,7 @@ function serializeUser(u) {
     verified_at: u.verified_at,
     terms_accepted_at: u.terms_accepted_at,
     notifications_enabled: u.notifications_enabled,
+    phone_visible: u.phone_visible,
     is_verified_trader: u.is_verified_trader,
     is_admin: u.is_admin,
     rating_avg: Number(u.rating_avg),

@@ -38,16 +38,16 @@ router.get(
   })
 );
 
-// Contact reveal: Phase 1 has no in-app chat (not part of the MVP scope), so
-// "تواصل مع البائع" reveals the seller's phone/WhatsApp instead — the buyer
-// then contacts them directly, which fits the platform's "listing intermediary
-// only" model from the spec.
+// Superseded by the listing-detail "اتصال" (call) / "رسالة خاصة" (chat)
+// options (see routes/listings.js GET /:id), which respect phone_visible —
+// kept for API compatibility but now honors the same setting instead of
+// always revealing the phone number regardless of the seller's choice.
 router.get(
   '/:id/contact',
   requireAuth,
   asyncHandler(async (req, res) => {
     const userRes = await pool.query(
-      'SELECT id, full_name, phone_country_code, phone_number, otp_verified_channel FROM users WHERE id = $1',
+      'SELECT id, full_name, phone_country_code, phone_number, phone_visible, otp_verified_channel FROM users WHERE id = $1',
       [req.params.id]
     );
     const seller = userRes.rows[0];
@@ -55,7 +55,7 @@ router.get(
 
     res.json({
       full_name: seller.full_name,
-      phone: `${seller.phone_country_code}${seller.phone_number}`,
+      phone: seller.phone_visible ? `${seller.phone_country_code}${seller.phone_number}` : null,
       whatsapp_verified: seller.otp_verified_channel === 'whatsapp',
     });
   })

@@ -361,6 +361,15 @@
       <input id="cl-images" type="file" accept="image/jpeg,image/png" multiple style="display:none" onchange="onImagesSelected(event)">
       <div class="thumb-strip" id="cl-thumbs"></div>
 
+      <label>الفيديو (اختياري)</label>
+      <div class="upload-drop" onclick="document.getElementById('cl-video').click()">
+        <i data-lucide="video" class="icon"></i>
+        اضغط لإضافة فيديو
+        <small>فيديو واحد فقط، حتى دقيقة</small>
+      </div>
+      <input id="cl-video" type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none" onchange="onVideoSelected(event)">
+      <div class="thumb-strip" id="cl-video-preview"></div>
+
       <label>الوصف والمميزات</label>
       <textarea id="cl-desc" placeholder="اكتب وصف حر عن حالة القطعة والمميزات..."></textarea>
 
@@ -439,6 +448,7 @@
       <div class="settings-row" onclick="openDealConfirmStandalone()"><i data-lucide="handshake" class="icon"></i><span>تأكيد صفقة وتسديد عمولة</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toast('قريباً')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toggleNotifRow()"><i data-lucide="bell" class="icon"></i><span>الإشعارات: <b id="notif-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="togglePhoneVisibility()"><i data-lucide="phone" class="icon"></i><span>رقم الجوال للمشترين: <b id="phone-visible-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('support')"><i data-lucide="headphones" class="icon"></i><span>الدعم الفني</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('terms-view')"><i data-lucide="file-text" class="icon"></i><span>الشروط والأحكام</span><i data-lucide="chevron-left" class="icon chev"></i></div>

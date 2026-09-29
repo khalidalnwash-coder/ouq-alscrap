@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { pool } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
-const { saveImage } = require('../utils/storage');
+const { saveImage, saveVideo, deleteVideo } = require('../utils/storage');
 const { asyncHandler } = require('../utils/asyncHandler');
 const {
   COUNTRIES,
@@ -32,6 +32,11 @@ const MAX_IMAGES = 10;
 // a server-side safety net rather than the normal case — kept a bit above
 // the client's own target size for uncompressed fallback uploads.
 const MAX_IMAGE_MB = 8;
+const MAX_VIDEOS = 1;
+const MAX_VIDEO_MB = 50;
+const MAX_VIDEO_DURATION_SECONDS = 60;
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png'];
+const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
 const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
 const CATEGORIES = ['spare_part', ...VEHICLE_CATEGORIES];
 const LISTING_TYPES = ['part', 'whole'];
@@ -39,14 +44,25 @@ const BUMP_COOLDOWN_HOURS = 24;
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_IMAGE_MB * 1024 * 1024, files: MAX_IMAGES },
+  // One global size cap across both fields (multer has no per-field limit) —
+  // set to the larger of the two since images are already client-compressed
+  // well under it.
+  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: MAX_IMAGES + MAX_VIDEOS },
   fileFilter: (_req, file, cb) => {
-    if (!['image/jpeg', 'image/png'].includes(file.mimetype)) {
+    if (file.fieldname === 'video') {
+      if (!VIDEO_MIME_TYPES.includes(file.mimetype)) {
+        return cb(new Error('صيغة الفيديو غير مدعومة (MP4 أو MOV أو WebM فقط)'));
+      }
+    } else if (!IMAGE_MIME_TYPES.includes(file.mimetype)) {
       return cb(new Error('الصور يجب أن تكون JPG أو PNG فقط'));
     }
     cb(null, true);
   },
 });
+const uploadMedia = upload.fields([
+  { name: 'images', maxCount: MAX_IMAGES },
+  { name: 'video', maxCount: MAX_VIDEOS },
+]);
 
 async function attachMedia(listings) {
   if (!listings.length) return listings;
@@ -199,7 +215,8 @@ router.get(
 
     const [withMedia] = await attachMedia([listing]);
     const sellerRes = await pool.query(
-      `SELECT id, full_name, account_type, is_verified_trader, rating_avg, completed_deals_count, created_at
+      `SELECT id, full_name, account_type, is_verified_trader, rating_avg, completed_deals_count, created_at,
+              phone_country_code, phone_number, phone_visible
        FROM users WHERE id = $1`,
       [listing.seller_id]
     );
@@ -225,7 +242,12 @@ router.get(
         status: withMedia.status,
         last_updated_at: withMedia.last_updated_at,
         created_at: withMedia.created_at,
-        media: withMedia.media.map((m) => ({ type: m.type, url: m.original_url, thumbnail_url: m.thumbnail_url })),
+        media: withMedia.media.map((m) => ({
+          type: m.type,
+          url: m.original_url,
+          thumbnail_url: m.thumbnail_url,
+          duration_seconds: m.duration_seconds,
+        })),
       },
       seller: seller
         ? {
@@ -236,6 +258,9 @@ router.get(
             rating_avg: Number(seller.rating_avg),
             completed_deals_count: seller.completed_deals_count,
             member_since: seller.created_at,
+            // Only revealed when the seller hasn't hidden it (profile setting)
+            // — buyers still always have the "رسالة خاصة" chat option.
+            phone: seller.phone_visible ? `${seller.phone_country_code}${seller.phone_number}` : null,
           }
         : null,
     });
@@ -245,7 +270,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  upload.array('images', MAX_IMAGES),
+  uploadMedia,
   asyncHandler(async (req, res) => {
     const {
       title,
@@ -369,14 +394,33 @@ router.post(
       );
       const listing = result.rows[0];
 
-      const files = req.files || [];
+      const imageFiles = (req.files && req.files.images) || [];
       let orderIndex = 0;
-      for (const file of files) {
+      for (const file of imageFiles) {
         const { originalUrl, thumbnailUrl, storageKey } = await saveImage(file.buffer);
         await client.query(
           `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, storage_key, order_index)
            VALUES ($1,'image',$2,$3,$4,$5)`,
           [listing.id, originalUrl, thumbnailUrl, storageKey || null, orderIndex++]
+        );
+      }
+
+      const videoFile = req.files && req.files.video && req.files.video[0];
+      if (videoFile) {
+        const { originalUrl, thumbnailUrl, storageKey, durationSeconds } = await saveVideo(videoFile.buffer, videoFile.mimetype);
+        // Client also checks duration before upload, but that's only a UX
+        // convenience — Cloudinary's returned duration is the real check.
+        // The local driver can't report a duration (durationSeconds stays
+        // null there), so nothing to enforce in dev.
+        if (durationSeconds != null && durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
+          deleteVideo({ storageKey });
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'مدة الفيديو يجب ألا تتجاوز دقيقة واحدة' });
+        }
+        await client.query(
+          `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, storage_key, duration_seconds, order_index)
+           VALUES ($1,'video',$2,$3,$4,$5,$6)`,
+          [listing.id, originalUrl, thumbnailUrl, storageKey || null, durationSeconds, orderIndex++]
         );
       }
 
