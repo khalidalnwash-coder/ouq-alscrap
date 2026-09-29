@@ -184,3 +184,9 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, created_at ASC);
+
+-- Storage-driver key for media uploaded under STORAGE_DRIVER=cloudinary (the
+-- Cloudinary public_id, needed to delete the asset later). NULL for media
+-- uploaded under the "local" driver, and for anything uploaded before this
+-- column existed — deleteImage() treats a missing key as "nothing to do".
+ALTER TABLE listing_media ADD COLUMN IF NOT EXISTS storage_key TEXT;
