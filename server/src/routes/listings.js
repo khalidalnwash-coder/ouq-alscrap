@@ -28,7 +28,10 @@ const {
 const router = express.Router();
 
 const MAX_IMAGES = 10;
-const MAX_IMAGE_MB = 5;
+// The client compresses images before upload (see public/app.js), so this is
+// a server-side safety net rather than the normal case — kept a bit above
+// the client's own target size for uncompressed fallback uploads.
+const MAX_IMAGE_MB = 8;
 const DAMAGE_LEVELS = ['light', 'medium', 'severe'];
 const CATEGORIES = ['spare_part', ...VEHICLE_CATEGORIES];
 const LISTING_TYPES = ['part', 'whole'];
@@ -369,11 +372,11 @@ router.post(
       const files = req.files || [];
       let orderIndex = 0;
       for (const file of files) {
-        const { originalUrl, thumbnailUrl } = await saveImage(file.buffer);
+        const { originalUrl, thumbnailUrl, storageKey } = await saveImage(file.buffer);
         await client.query(
-          `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, order_index)
-           VALUES ($1,'image',$2,$3,$4)`,
-          [listing.id, originalUrl, thumbnailUrl, orderIndex++]
+          `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, storage_key, order_index)
+           VALUES ($1,'image',$2,$3,$4,$5)`,
+          [listing.id, originalUrl, thumbnailUrl, storageKey || null, orderIndex++]
         );
       }
 

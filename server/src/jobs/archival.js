@@ -41,11 +41,11 @@ async function runArchivalSweep() {
   );
   for (const row of toDelete.rows) {
     const mediaRes = await pool.query(
-      'SELECT original_url, thumbnail_url FROM listing_media WHERE listing_id = $1',
+      'SELECT original_url, thumbnail_url, storage_key FROM listing_media WHERE listing_id = $1',
       [row.id]
     );
     for (const m of mediaRes.rows) {
-      deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url });
+      deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url, storageKey: m.storage_key });
     }
     await pool.query('DELETE FROM listings WHERE id = $1', [row.id]); // cascades listing_media
   }

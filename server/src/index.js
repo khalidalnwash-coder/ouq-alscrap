@@ -17,7 +17,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/uploads', express.static(uploadsDir));
+// Only served under STORAGE_DRIVER=local — the cloudinary driver serves
+// media directly from Cloudinary's own URLs, so there's no local uploadsDir.
+if (uploadsDir) app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(path.join(__dirname, '..', '..', 'public')));
 
 app.use('/api/auth', authRoutes);

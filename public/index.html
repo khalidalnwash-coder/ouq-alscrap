@@ -308,14 +308,20 @@
 
       <div id="cl-block-car-compat">
         <label>مطابقة (اختياري)</label>
+        <label>نوع المركبة</label>
+        <select id="cl-compat-type" onchange="onCompatTypeChange()"></select>
         <div class="row2">
-          <div><input id="cl-make" placeholder="الشركة المصنعة"></div>
-          <div><input id="cl-model" placeholder="الموديل"></div>
+          <div>
+            <select id="cl-compat-make" onchange="onCompatMakeChange()"></select>
+            <input id="cl-compat-make-other" placeholder="اكتب اسم الشركة المصنّعة" style="display:none;">
+          </div>
+          <div>
+            <select id="cl-compat-model" onchange="onCompatModelChange()"></select>
+            <input id="cl-compat-model-other" placeholder="الموديل (اختياري)" style="display:none;">
+          </div>
         </div>
-        <div class="row2">
-          <div><select id="cl-year-from"></select></div>
-          <div><select id="cl-year-to"></select></div>
-        </div>
+        <label>مطابقة سنة (اختياري)</label>
+        <select id="cl-compat-year"></select>
       </div>
 
       <div id="cl-block-vehicle-part-compat" style="display:none;">
@@ -325,10 +331,7 @@
         <select id="cl-vehicle-part-model" onchange="onVehicleModelChange('part')"></select>
         <input id="cl-vehicle-part-model-other" placeholder="اكتب اسم الموديل" style="display:none;">
         <label>مطابقة سنة (اختياري)</label>
-        <div class="row2">
-          <div><select id="cl-vehicle-part-year-from"></select></div>
-          <div><select id="cl-vehicle-part-year-to"></select></div>
-        </div>
+        <select id="cl-vehicle-part-year"></select>
       </div>
 
       <div id="cl-block-vehicle-whole" style="display:none;">
@@ -353,7 +356,7 @@
       <div class="upload-drop" onclick="document.getElementById('cl-images').click()">
         <i data-lucide="camera" class="icon"></i>
         اضغط لإضافة صور
-        <small>حتى 10 صور، 5 ميجا لكل صورة</small>
+        <small>حتى 10 صور — يتم ضغطها تلقائياً قبل الرفع</small>
       </div>
       <input id="cl-images" type="file" accept="image/jpeg,image/png" multiple style="display:none" onchange="onImagesSelected(event)">
       <div class="thumb-strip" id="cl-thumbs"></div>

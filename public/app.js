@@ -48,7 +48,15 @@ async function api(path, { method = 'GET', body, isForm = false } = {}) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
-  const res = await fetch('/api' + path, { method, headers, body: payload });
+  let res;
+  try {
+    res = await fetch('/api' + path, { method, headers, body: payload });
+  } catch {
+    // fetch() itself rejects (network drop, timeout, server unreachable)
+    // before any HTTP response exists — the browser's own message here
+    // (e.g. Safari's "Load failed") is not something a user can act on.
+    throw new Error('تعذّر الاتصال بالخادم، تحقق من اتصال الإنترنت وحاول مرة أخرى');
+  }
   let data = {};
   try { data = await res.json(); } catch { /* no body */ }
   if (!res.ok) {
@@ -1007,17 +1015,83 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- create listing ----------
+// Manufacturer/model pickers for the generic "قطع غيار" flow (createMode ===
+// 'car_part'): unlike the dedicated vehicle sections, this flow has no
+// vehicle category pre-selected, so a "نوع المركبة" select decides which of
+// meta.vehicle_categories' make lists to show — same lists as the section
+// filters, with the same "أخرى" free-text fallback pattern used elsewhere.
+// The chosen type is a client-side-only convenience; the listing's category
+// stays 'spare_part' either way.
+function compatTypeMeta() {
+  const type = document.getElementById('cl-compat-type').value;
+  return (meta.vehicle_categories && meta.vehicle_categories[type]) || { makes: [], models_by_make: {} };
+}
+function populateCompatTypeSelect() {
+  const cats = meta.vehicle_categories || {};
+  const order = ['full_car', 'motorcycle', 'truck'].filter((k) => cats[k]);
+  document.getElementById('cl-compat-type').innerHTML = order
+    .map((key) => `<option value="${key}">${escapeHtml(cats[key].label)}</option>`)
+    .join('');
+}
+function onCompatTypeChange() {
+  populateCompatMakeSelect();
+}
+function populateCompatMakeSelect() {
+  const makes = compatTypeMeta().makes || [];
+  const select = document.getElementById('cl-compat-make');
+  select.innerHTML = '<option value="">— بدون تحديد —</option>' + makes.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+  select.value = '';
+  onCompatMakeChange();
+}
+function onCompatMakeChange() {
+  const select = document.getElementById('cl-compat-make');
+  const other = document.getElementById('cl-compat-make-other');
+  other.style.display = select.value === 'أخرى' ? 'block' : 'none';
+  other.value = '';
+  populateCompatModelSelect();
+}
+function populateCompatModelSelect() {
+  const make = getCompatMakeValue();
+  const models = make ? (compatTypeMeta().models_by_make[make] || []).filter((m) => m !== 'أخرى') : [];
+  const select = document.getElementById('cl-compat-model');
+  const other = document.getElementById('cl-compat-model-other');
+  other.value = '';
+  if (models.length) {
+    select.style.display = 'block';
+    select.innerHTML = '<option value="">— بدون تحديد —</option>' + models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    other.style.display = 'none';
+  } else {
+    select.style.display = 'none';
+    select.innerHTML = '';
+    other.style.display = 'block';
+  }
+}
+function onCompatModelChange() {
+  const select = document.getElementById('cl-compat-model');
+  const other = document.getElementById('cl-compat-model-other');
+  other.style.display = select.value === 'أخرى' ? 'block' : 'none';
+}
+function getCompatMakeValue() {
+  const select = document.getElementById('cl-compat-make');
+  const other = document.getElementById('cl-compat-make-other');
+  return select.value === 'أخرى' ? other.value.trim() : select.value;
+}
+function getCompatModelValue() {
+  const select = document.getElementById('cl-compat-model');
+  const other = document.getElementById('cl-compat-model-other');
+  if (select.style.display === 'none' || select.value === 'أخرى') return other.value.trim();
+  return select.value;
+}
+
 function prepareCreateScreen() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
   document.getElementById('cl-title').value = '';
   document.getElementById('cl-desc').value = '';
   document.getElementById('cl-price').value = '';
-  document.getElementById('cl-make').value = '';
-  document.getElementById('cl-model').value = '';
-  document.getElementById('cl-year-from').innerHTML = yearOptionsHtml();
-  document.getElementById('cl-year-to').innerHTML = yearOptionsHtml();
-  document.getElementById('cl-vehicle-part-year-from').innerHTML = yearOptionsHtml();
-  document.getElementById('cl-vehicle-part-year-to').innerHTML = yearOptionsHtml();
+  populateCompatTypeSelect();
+  populateCompatMakeSelect();
+  document.getElementById('cl-compat-year').innerHTML = yearOptionsHtml();
+  document.getElementById('cl-vehicle-part-year').innerHTML = yearOptionsHtml();
   document.getElementById('cl-vehicle-part-model-other').value = '';
   document.getElementById('cl-vehicle-whole-year').innerHTML = yearOptionsHtml(null, { required: true });
   document.getElementById('cl-vehicle-whole-damage').value = 'light';
@@ -1076,17 +1150,57 @@ function getVehicleModelValue(mode) {
   return select.value;
 }
 const MAX_IMAGES = 10;
-const MAX_IMAGE_MB = 5;
-function onImagesSelected(e) {
+const MAX_IMAGE_MB = 8; // matches the server's safety-net limit; compressed photos land far below this
+const MAX_ORIGINAL_IMAGE_MB = 40; // reject absurdly large originals before even trying to decode them
+const IMAGE_MAX_DIMENSION = 1920;
+const IMAGE_JPEG_QUALITY = 0.82;
+
+// Phone/tablet camera photos are often huge (10-20+ MB) and were causing
+// uploads to fail outright (raw multipart payload too large / too slow over
+// mobile data). Resize + re-encode in the browser before ever sending the
+// file, using the canvas API (no library needed) — createImageBitmap also
+// auto-corrects EXIF orientation in modern browsers, so no manual rotation.
+async function compressImageFile(file) {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > IMAGE_MAX_DIMENSION || height > IMAGE_MAX_DIMENSION) {
+    const scale = IMAGE_MAX_DIMENSION / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  if (bitmap.close) bitmap.close();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', IMAGE_JPEG_QUALITY));
+  if (!blob) throw new Error('compression produced no blob');
+  const name = file.name.replace(/\.\w+$/, '') + '.jpg';
+  return new File([blob], name, { type: 'image/jpeg' });
+}
+
+async function onImagesSelected(e) {
   const files = Array.from(e.target.files || []);
+  e.target.value = '';
   for (const f of files) {
     if (selectedImages.length >= MAX_IMAGES) { toast(`الحد الأقصى ${MAX_IMAGES} صور`); break; }
-    if (f.size > MAX_IMAGE_MB * 1024 * 1024) { toast(`الصورة "${f.name}" أكبر من 5 ميجا`); continue; }
     if (!['image/jpeg', 'image/png'].includes(f.type)) { toast('الصور يجب أن تكون JPG أو PNG'); continue; }
-    selectedImages.push(f);
+    if (f.size > MAX_ORIGINAL_IMAGE_MB * 1024 * 1024) { toast(`الصورة "${f.name}" كبيرة جداً`); continue; }
+    let compressed;
+    try {
+      compressed = await compressImageFile(f);
+    } catch {
+      toast(`تعذّر معالجة الصورة "${f.name}"، جرّب صورة أخرى`);
+      continue;
+    }
+    if (compressed.size > MAX_IMAGE_MB * 1024 * 1024) {
+      toast(`الصورة "${f.name}" كبيرة جداً حتى بعد الضغط`);
+      continue;
+    }
+    selectedImages.push(compressed);
+    renderThumbs();
   }
-  e.target.value = '';
-  renderThumbs();
 }
 function renderThumbs() {
   const el = document.getElementById('cl-thumbs');
@@ -1134,8 +1248,12 @@ async function publishListing() {
         return showError('cl-error', 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة');
       }
       fd.append('part_category', part_category);
-      fd.append('compatible_year_from', document.getElementById('cl-vehicle-part-year-from').value);
-      fd.append('compatible_year_to', document.getElementById('cl-vehicle-part-year-to').value);
+      // Single year field (اختياري) — sent as both bounds of the existing
+      // compatible_year_from/to range so a part with no year set still
+      // matches "any year" in search, same as before this change.
+      const year = document.getElementById('cl-vehicle-part-year').value;
+      fd.append('compatible_year_from', year);
+      fd.append('compatible_year_to', year);
     }
   } else {
     const part_category = document.getElementById('cl-part-category').value;
@@ -1143,10 +1261,11 @@ async function publishListing() {
       return showError('cl-error', 'عنوان الإعلان والسعر والمدينة وفئة القطعة مطلوبة');
     }
     fd.append('part_category', part_category);
-    fd.append('compatible_make', document.getElementById('cl-make').value.trim());
-    fd.append('compatible_model', document.getElementById('cl-model').value.trim());
-    fd.append('compatible_year_from', document.getElementById('cl-year-from').value);
-    fd.append('compatible_year_to', document.getElementById('cl-year-to').value);
+    fd.append('compatible_make', getCompatMakeValue());
+    fd.append('compatible_model', getCompatModelValue());
+    const year = document.getElementById('cl-compat-year').value;
+    fd.append('compatible_year_from', year);
+    fd.append('compatible_year_to', year);
   }
   selectedImages.forEach((f) => fd.append('images', f));
 
