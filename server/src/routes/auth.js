@@ -52,7 +52,8 @@ router.post(
       return res.status(400).json({ error: 'اختر طريقة استلام كود التحقق' });
     }
 
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await pool.query('SELECT id FROM users WHERE LOWER(TRIM(email)) = $1', [normalizedEmail]);
     if (existing.rows.length) {
       return res.status(409).json({ error: 'هذا البريد الإلكتروني مسجّل مسبقاً' });
     }
@@ -71,7 +72,7 @@ router.post(
         account_type,
         phone_country_code,
         phone_number,
-        email,
+        normalizedEmail,
         passwordHash,
         age || null,
         country,
@@ -82,7 +83,7 @@ router.post(
     );
     const user = result.rows[0];
 
-    const destination = otp_channel === 'whatsapp' ? `${phone_country_code}${phone_number}` : email;
+    const destination = otp_channel === 'whatsapp' ? `${phone_country_code}${phone_number}` : normalizedEmail;
     sendOtpMock({ channel: otp_channel, destination, code });
 
     res.status(201).json({
@@ -98,6 +99,23 @@ router.post(
 
 async function findByUserId(userId) {
   const r = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  return r.rows[0];
+}
+
+// Email lookups must ignore case/whitespace everywhere (signup existence
+// check, login, forgot-password) so the same address always resolves to the
+// same account regardless of how it's typed. LOWER(TRIM(email)) on the
+// column side handles rows already stored with mixed case or stray spaces
+// from before this normalization existed — no backfill/migration needed,
+// and no existing account is touched. Phone-number matching stays exact
+// (trimmed only): phone numbers have no case, and identifier here may be
+// either an email or a phone number.
+async function findUserByIdentifier(identifier) {
+  const trimmed = (identifier || '').trim();
+  const r = await pool.query(
+    'SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER($1) OR phone_number = $1',
+    [trimmed]
+  );
   return r.rows[0];
 }
 
@@ -179,11 +197,7 @@ router.post(
     if (!identifier || !password) {
       return res.status(400).json({ error: 'أدخل البريد/الجوال وكلمة المرور' });
     }
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1 OR phone_number = $1',
-      [identifier]
-    );
-    const user = result.rows[0];
+    const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
     if (user.status === 'suspended') return res.status(403).json({ error: 'الحساب موقوف' });
     if (!user.verified_at) return res.status(403).json({ error: 'الحساب غير مفعّل بعد' });
@@ -203,11 +217,7 @@ router.post(
     if (!['whatsapp', 'email'].includes(otp_channel)) {
       return res.status(400).json({ error: 'اختر طريقة استلام كود التحقق' });
     }
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1 OR phone_number = $1',
-      [identifier]
-    );
-    const user = result.rows[0];
+    const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(404).json({ error: 'لا يوجد حساب بهذا البريد/الجوال' });
 
     const code = generateOtp();
