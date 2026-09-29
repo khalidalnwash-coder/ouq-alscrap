@@ -5,7 +5,7 @@
 // relevant state so re-running mid-sweep never double-applies an action.
 
 const { pool } = require('../db');
-const { deleteImage } = require('../utils/storage');
+const { deleteImage, deleteVideo } = require('../utils/storage');
 const { ARCHIVE_WARNING_DAYS, ARCHIVE_DAYS, HARD_DELETE_DAYS_AFTER_ARCHIVE } = require('../utils/constants');
 
 async function runArchivalSweep() {
@@ -41,11 +41,15 @@ async function runArchivalSweep() {
   );
   for (const row of toDelete.rows) {
     const mediaRes = await pool.query(
-      'SELECT original_url, thumbnail_url, storage_key FROM listing_media WHERE listing_id = $1',
+      'SELECT type, original_url, thumbnail_url, storage_key FROM listing_media WHERE listing_id = $1',
       [row.id]
     );
     for (const m of mediaRes.rows) {
-      deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url, storageKey: m.storage_key });
+      if (m.type === 'video') {
+        deleteVideo({ originalUrl: m.original_url, storageKey: m.storage_key });
+      } else {
+        deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url, storageKey: m.storage_key });
+      }
     }
     await pool.query('DELETE FROM listings WHERE id = $1', [row.id]); // cascades listing_media
   }

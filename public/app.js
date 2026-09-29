@@ -705,8 +705,44 @@ function openVehicleCreateWhole() {
 }
 
 // ---------- listing detail ----------
+// Order (spec): العنوان -> المدينة + وقت النشر -> اسم البائع -> [سعر/تفاصيل] ->
+// الوصف -> الصور و/أو الفيديو -> زر تواصل (اتصال / رسالة خاصة).
 let currentListingDetail = null;
 let currentSellerDetail = null;
+let currentDetailMedia = [];
+
+function detailMediaItemHtml(m) {
+  if (m.type === 'video') {
+    return `<video src="${m.url}" controls style="width:100%; height:100%; object-fit:cover;"></video>`;
+  }
+  return `<img src="${m.url}" style="width:100%; height:100%; object-fit:cover;">`;
+}
+function selectDetailMedia(i) {
+  const main = document.getElementById('detail-media-main');
+  if (main && currentDetailMedia[i]) main.innerHTML = detailMediaItemHtml(currentDetailMedia[i]);
+}
+function renderDetailMedia(media) {
+  currentDetailMedia = media;
+  if (!media.length) {
+    return `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${icon('image', 'icon-xl')}</div>`;
+  }
+  const mainHtml = `<div class="listing-thumb" id="detail-media-main" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${detailMediaItemHtml(media[0])}</div>`;
+  if (media.length === 1) return mainHtml;
+  const stripHtml = `<div class="thumb-strip">${media.map((m, i) => `
+    <div class="thumb" style="cursor:pointer;" onclick="selectDetailMedia(${i})">
+      ${m.type === 'video' && m.thumbnail_url ? `<img src="${m.thumbnail_url}">` : ''}
+      ${m.type === 'video' && !m.thumbnail_url ? `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--blue-light);">${icon('video', 'icon-sm')}</div>` : ''}
+      ${m.type === 'image' ? `<img src="${m.thumbnail_url || m.url}">` : ''}
+      ${m.type === 'video' ? `<span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.25); pointer-events:none;">${icon('play', 'icon-sm')}</span>` : ''}
+    </div>`).join('')}</div>`;
+  return mainHtml + stripHtml;
+}
+function callSeller() {
+  if (currentSellerDetail && currentSellerDetail.phone) {
+    window.location.href = 'tel:' + currentSellerDetail.phone;
+  }
+}
+
 async function openDetail(id) {
   currentListingId = id;
   go('detail');
@@ -717,9 +753,6 @@ async function openDetail(id) {
     currentListingDetail = listing;
     currentSellerDetail = seller;
     const isOwnListing = currentUser && seller && currentUser.id === seller.id;
-    const img = listing.media[0]
-      ? `<img src="${listing.media[0].url}" style="width:100%; height:100%; object-fit:cover;">`
-      : icon('image', 'icon-xl');
     const isWhole = listing.listing_type === 'whole';
     const compatBits = [listing.compatible_make, listing.compatible_model].filter(Boolean).join(' ');
     const yearRange = listing.compatible_year_from || listing.compatible_year_to
@@ -735,34 +768,42 @@ async function openDetail(id) {
       ? `<p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">${icon('bike', 'icon-xs')} ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>`
       : (compatBits || yearRange ? `<p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">${icon('wrench', 'icon-xs')} ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>` : '');
 
+    const contactRow = isOwnListing ? '' : `
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        ${seller.phone ? `<button class="btn-primary" style="flex:1;" onclick="callSeller()">${icon('phone', 'icon-sm')} اتصال</button>` : ''}
+        <button class="btn-${seller.phone ? 'outline' : 'primary'}" style="flex:1;" onclick="openConversationFromListing()">${icon('message-circle', 'icon-sm')} رسالة خاصة</button>
+        <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px; flex-shrink:0;" title="إبلاغ عن الإعلان" onclick="openReportListing()">${icon('flag', 'icon-sm')}</button>
+      </div>`;
+
     body.innerHTML = `
-      <div class="listing-thumb" style="height:190px; border-radius:var(--radius-sm); margin-bottom:12px;">${img}</div>
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
         <h3 style="font-size:var(--fs-md); font-weight:700;">${escapeHtml(listing.title)}</h3>
         ${topBadge}
       </div>
-      ${identityLine}
-      <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">${icon('map-pin', 'icon-xs')} ${escapeHtml(listing.city)}${countryInfo(listing.country) ? `، ${countryInfo(listing.country).flag} ${escapeHtml(countryInfo(listing.country).label)}` : ''}</p>
-      ${listing.description ? `<p style="font-size:var(--fs-base); line-height:1.7; margin-bottom:14px;">${escapeHtml(listing.description)}</p>` : ''}
-
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;" onclick="openSeller('${seller.id}')">
+      <p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">${icon('map-pin', 'icon-xs')} ${escapeHtml(listing.city)}${countryInfo(listing.country) ? `، ${countryInfo(listing.country).flag} ${escapeHtml(countryInfo(listing.country).label)}` : ''} • ${timeAgoFull(listing.created_at)}</p>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; cursor:pointer;" onclick="openSeller('${seller.id}')">
         <div class="avatar" style="width:32px; height:32px; font-size:var(--fs-xs);">${initials(seller.full_name)}</div>
         <span style="font-size:var(--fs-sm); font-weight:500;">${escapeHtml(seller.full_name)}</span>
         ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}
       </div>
+      ${identityLine}
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:12px 0; margin-bottom:12px;">
+        <span style="font-size:var(--fs-xl); font-weight:700; color:var(--blue);">${formatPrice(listing.price, listing.currency)}</span>
+      </div>
+
+      ${listing.description ? `<p style="font-size:var(--fs-base); line-height:1.7; margin-bottom:14px;">${escapeHtml(listing.description)}</p>` : ''}
+
+      ${renderDetailMedia(listing.media)}
+      <div style="margin-bottom:6px;"></div>
+
+      ${contactRow}
 
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
         <span class="muted">${seller.completed_deals_count} صفقة</span>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-bottom:12px; gap:8px;">
-        <span style="font-size:var(--fs-xl); font-weight:700; color:var(--blue);">${formatPrice(listing.price, listing.currency)}</span>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button class="btn-primary" style="width:auto; padding:11px 20px;" ${isOwnListing ? 'disabled' : ''} onclick="openConversationFromListing()">تواصل مع البائع</button>
-          <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px;" title="إبلاغ عن الإعلان" onclick="openReportListing()">${icon('flag', 'icon-sm')}</button>
-        </div>
-      </div>
       ${!isOwnListing ? `<button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد العمولة</button>` : ''}
     `;
     refreshIcons();
@@ -924,6 +965,28 @@ function timeAgoShort(iso) {
   if (hours < 24) return `${hours} س`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days} يوم`;
+  return new Date(iso).toLocaleDateString('ar');
+}
+
+// Full "قبل ساعة" / "قبل يومين" style relative time for the listing detail
+// screen — same idea as timeAgoShort but with proper Arabic singular/dual/
+// plural wording instead of a bare number, matching how a marketplace
+// listing's post time is normally phrased.
+function timeAgoFull(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'الآن';
+  const phrase = (n, singular, dual, plural) => {
+    if (n === 1) return `قبل ${singular}`;
+    if (n === 2) return `قبل ${dual}`;
+    if (n <= 10) return `قبل ${n} ${plural}`;
+    return `قبل ${n} ${singular}`;
+  };
+  if (mins < 60) return phrase(mins, 'دقيقة', 'دقيقتين', 'دقائق');
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return phrase(hours, 'ساعة', 'ساعتين', 'ساعات');
+  const days = Math.floor(hours / 24);
+  if (days < 30) return phrase(days, 'يوم', 'يومين', 'أيام');
   return new Date(iso).toLocaleDateString('ar');
 }
 
@@ -1100,6 +1163,8 @@ function prepareCreateScreen() {
   onCreateCountryChange();
   selectedImages = [];
   renderThumbs();
+  selectedVideo = null;
+  renderVideoPreview();
   hideError('cl-error');
 
   const heading = document.getElementById('cl-heading');
@@ -1213,6 +1278,63 @@ function removeImage(i) {
   selectedImages.splice(i, 1);
   renderThumbs();
 }
+
+// ---------- video (create listing) ----------
+let selectedVideo = null; // File | null — one video per listing
+const MAX_VIDEO_MB = 50;
+const MAX_VIDEO_DURATION_SECONDS = 60;
+const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
+
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const videoEl = document.createElement('video');
+    videoEl.preload = 'metadata';
+    videoEl.onloadedmetadata = () => {
+      URL.revokeObjectURL(videoEl.src);
+      resolve(videoEl.duration);
+    };
+    videoEl.onerror = () => {
+      URL.revokeObjectURL(videoEl.src);
+      reject(new Error('cannot read video metadata'));
+    };
+    videoEl.src = URL.createObjectURL(file);
+  });
+}
+async function onVideoSelected(e) {
+  const file = (e.target.files || [])[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!VIDEO_MIME_TYPES.includes(file.type)) {
+    return toast('صيغة الفيديو غير مدعومة (MP4 أو MOV أو WebM فقط)');
+  }
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+    return toast(`حجم الفيديو أكبر من ${MAX_VIDEO_MB} ميجا`);
+  }
+  let duration;
+  try {
+    duration = await readVideoDuration(file);
+  } catch {
+    return toast('تعذّر قراءة الفيديو، جرّب ملفاً آخر');
+  }
+  // +1s tolerance for container/rounding differences between what the
+  // browser reports here and what the server measures after upload.
+  if (duration > MAX_VIDEO_DURATION_SECONDS + 1) {
+    return toast('مدة الفيديو يجب ألا تتجاوز دقيقة واحدة');
+  }
+  selectedVideo = file;
+  renderVideoPreview();
+}
+function renderVideoPreview() {
+  const el = document.getElementById('cl-video-preview');
+  el.innerHTML = selectedVideo
+    ? `<div class="thumb"><video src="${URL.createObjectURL(selectedVideo)}" muted style="width:100%; height:100%; object-fit:cover;"></video><span class="rm" onclick="removeVideo()">${icon('x')}</span></div>`
+    : '';
+  refreshIcons();
+}
+function removeVideo() {
+  selectedVideo = null;
+  renderVideoPreview();
+}
 async function publishListing() {
   hideError('cl-error');
   const title = document.getElementById('cl-title').value.trim();
@@ -1268,6 +1390,7 @@ async function publishListing() {
     fd.append('compatible_year_to', year);
   }
   selectedImages.forEach((f) => fd.append('images', f));
+  if (selectedVideo) fd.append('video', selectedVideo);
 
   const btn = document.getElementById('cl-submit');
   btn.disabled = true;
@@ -1349,6 +1472,7 @@ async function renderProfile() {
   document.getElementById('profile-name').textContent = currentUser.full_name;
   document.getElementById('profile-email').textContent = currentUser.email;
   document.getElementById('notif-state').textContent = currentUser.notifications_enabled ? 'مفعّلة' : 'معطّلة';
+  document.getElementById('phone-visible-state').textContent = currentUser.phone_visible ? 'ظاهر' : 'مخفي';
   document.getElementById('admin-row').style.display = currentUser.is_admin ? 'flex' : 'none';
 }
 async function toggleNotifRow() {
@@ -1357,6 +1481,16 @@ async function toggleNotifRow() {
     currentUser = res.user;
     document.getElementById('notif-state').textContent = currentUser.notifications_enabled ? 'مفعّلة' : 'معطّلة';
     toast(currentUser.notifications_enabled ? 'تم تفعيل الإشعارات' : 'تم إيقاف الإشعارات');
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function togglePhoneVisibility() {
+  try {
+    const res = await api('/auth/phone-visibility', { method: 'PATCH', body: { visible: !currentUser.phone_visible } });
+    currentUser = res.user;
+    document.getElementById('phone-visible-state').textContent = currentUser.phone_visible ? 'ظاهر' : 'مخفي';
+    toast(currentUser.phone_visible ? 'تم إظهار رقم جوالك للمشترين' : 'تم إخفاء رقم جوالك — يظهر لهم "رسالة خاصة" فقط');
   } catch (err) {
     toast(err.message);
   }

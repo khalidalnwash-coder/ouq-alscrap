@@ -179,6 +179,19 @@ router.patch(
 );
 
 router.patch(
+  '/phone-visibility',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const visible = !!(req.body && req.body.visible);
+    const result = await pool.query(
+      'UPDATE users SET phone_visible = $1 WHERE id = $2 RETURNING *',
+      [visible, req.userId]
+    );
+    res.json({ user: serializeUser(result.rows[0]) });
+  })
+);
+
+router.patch(
   '/accept-terms',
   requireAuth,
   asyncHandler(async (req, res) => {

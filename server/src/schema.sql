@@ -190,3 +190,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_i
 -- uploaded under the "local" driver, and for anything uploaded before this
 -- column existed — deleteImage() treats a missing key as "nothing to do".
 ALTER TABLE listing_media ADD COLUMN IF NOT EXISTS storage_key TEXT;
+
+-- Lets a seller hide their phone number from the listing-detail "اتصال"
+-- (call) option — buyers then only see "رسالة خاصة" (in-app chat).
+-- Defaults to visible, matching behavior before this setting existed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_visible BOOLEAN NOT NULL DEFAULT true;
