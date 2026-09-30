@@ -2,26 +2,28 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { REPORT_REASONS_LISTING, REPORT_REASONS_ACCOUNT } = require('../utils/constants');
+const { REPORT_REASONS_LISTING, REPORT_REASONS_ACCOUNT, REPORT_REASONS_COMMENT } = require('../utils/constants');
 
 const router = express.Router();
 
 const REASON_VALUES = {
   listing: REPORT_REASONS_LISTING.map((r) => r.value),
   account: REPORT_REASONS_ACCOUNT.map((r) => r.value),
+  comment: REPORT_REASONS_COMMENT.map((r) => r.value),
 };
+const TARGET_TABLE = { listing: 'listings', account: 'users', comment: 'listing_comments' };
 
-// POST /api/reports — spec Section 10. target_type has its own reason list
-// (enforced here, not just client-side) — "commission evasion" is never a
-// valid value on either list, by construction (it's simply not in either
-// REASON_VALUES array).
+// POST /api/reports — spec Section 10 (plus a third target: a listing
+// comment). target_type has its own reason list (enforced here, not just
+// client-side) — "commission evasion" is never a valid value on any list,
+// by construction (it's simply not in any REASON_VALUES array).
 router.post(
   '/',
   requireAuth,
   asyncHandler(async (req, res) => {
     const { target_type, target_id, reason, details } = req.body || {};
 
-    if (!['listing', 'account'].includes(target_type)) {
+    if (!TARGET_TABLE[target_type]) {
       return res.status(400).json({ error: 'نوع الجهة المبلّغ عنها غير صالح' });
     }
     if (!target_id) {
@@ -34,7 +36,7 @@ router.post(
       return res.status(400).json({ error: 'اكتب تفاصيل السبب' });
     }
 
-    const table = target_type === 'listing' ? 'listings' : 'users';
+    const table = TARGET_TABLE[target_type];
     const exists = await pool.query(`SELECT id FROM ${table} WHERE id = $1`, [target_id]);
     if (!exists.rows[0]) {
       return res.status(404).json({ error: 'الجهة المبلّغ عنها غير موجودة' });

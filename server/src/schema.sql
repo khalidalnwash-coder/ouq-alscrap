@@ -195,3 +195,50 @@ ALTER TABLE listing_media ADD COLUMN IF NOT EXISTS storage_key TEXT;
 -- (call) option — buyers then only see "رسالة خاصة" (in-app chat).
 -- Defaults to visible, matching behavior before this setting existed.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_visible BOOLEAN NOT NULL DEFAULT true;
+
+-- Public Q&A thread under a listing (spec-adjacent addition). Flat list, no
+-- threading/replies — the seller's own comments are simply distinguishable
+-- client-side (author_id === listings.seller_id), no separate flag needed.
+-- Anyone can read; posting requires an account (enforced at the API layer).
+CREATE TABLE IF NOT EXISTS listing_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_listing_comments_listing ON listing_comments (listing_id, created_at ASC);
+
+-- Seller reviews: 1-5 star rating with an optional text comment. One review
+-- per (seller, reviewer) pair (UNIQUE below, plus an API-layer pre-check).
+-- Eligibility (must have messaged or confirmed a deal with the seller) is
+-- enforced only at the API layer — deliberately not modeled here, since it
+-- depends on the conversations/transactions tables together and is cheaper
+-- to check with a query than to encode as a constraint. No UPDATE/DELETE
+-- route exists for this table at all — a seller can never touch a review
+-- left on their own account, by construction, not just by permission check.
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (seller_id != reviewer_id),
+  UNIQUE (seller_id, reviewer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_seller ON reviews (seller_id, created_at DESC);
+
+-- users.rating_avg already existed (always 0 — nothing ever wrote to it).
+-- It's now kept in sync with the reviews table on every insert, alongside
+-- this new count column, so every existing display of rating_avg across
+-- the app starts reflecting real data with no further changes needed there.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reviews_count INTEGER NOT NULL DEFAULT 0;
+
+-- Widen reports.target_type to also cover a listing comment (report button
+-- on each comment, reusing the existing reporting system/admin queue).
+ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_target_type_check;
+ALTER TABLE reports ADD CONSTRAINT reports_target_type_check
+  CHECK (target_type IN ('listing','account','comment'));

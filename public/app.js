@@ -786,7 +786,7 @@ async function openDetail(id) {
   const body = document.getElementById('detail-body');
   body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
-    const { listing, seller } = await api('/listings/' + id);
+    const { listing, seller, similar_listings } = await api('/listings/' + id);
     currentListingDetail = listing;
     currentSellerDetail = seller;
     const isOwnListing = currentUser && seller && currentUser.id === seller.id;
@@ -825,6 +825,7 @@ async function openDetail(id) {
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; cursor:pointer;" onclick="openSeller('${seller.id}')">
         <div class="avatar" style="width:32px; height:32px; font-size:var(--fs-xs);">${initials(seller.full_name)}</div>
         <span style="font-size:var(--fs-sm); font-weight:500;">${escapeHtml(seller.full_name)}</span>
+        <span class="muted" style="font-size:var(--fs-xs); display:flex; align-items:center; gap:3px;">${icon('star', 'icon-xs icon-star-filled')} ${seller.rating_avg.toFixed(1)} (${seller.reviews_count})</span>
         ${seller.is_verified_trader ? `<span class="badge badge-success">${icon('badge-check')} موثّق</span>` : ''}
       </div>
       ${identityLine}
@@ -842,15 +843,83 @@ async function openDetail(id) {
 
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
-        <span class="muted">${seller.completed_deals_count} صفقة</span>
+        <span class="muted">${seller.reviews_count} تقييم</span>
       </div>
 
       ${!isOwnListing ? `<button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد العمولة</button>` : ''}
     `;
     refreshIcons();
+    renderComments();
+    renderSimilarListings(similar_listings);
   } catch (err) {
     body.innerHTML = `<p class="muted">تعذّر تحميل الإعلان: ${escapeHtml(err.message)}</p>`;
+    document.getElementById('similar-listings-section').style.display = 'none';
   }
+}
+
+// ---------- comments (public Q&A thread under a listing) ----------
+let currentListingComments = [];
+async function renderComments() {
+  const listEl = document.getElementById('detail-comments-list');
+  listEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  document.getElementById('detail-comment-form-box').style.display = currentUser ? 'block' : 'none';
+  document.getElementById('detail-comment-login-hint').style.display = currentUser ? 'none' : 'block';
+  document.getElementById('detail-comment-input').value = '';
+  try {
+    const { comments } = await api('/listings/' + currentListingId + '/comments');
+    currentListingComments = comments;
+    listEl.innerHTML = comments.length
+      ? comments.map(commentRow).join('')
+      : '<p class="muted">لا توجد تعليقات بعد</p>';
+    refreshIcons();
+  } catch {
+    listEl.innerHTML = '<p class="muted">تعذّر تحميل التعليقات</p>';
+  }
+}
+function commentRow(c) {
+  const isSeller = currentSellerDetail && c.author_id === currentSellerDetail.id;
+  return `<div style="border-bottom:1px solid var(--border); padding:10px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:6px;">
+      <span style="font-weight:600; font-size:var(--fs-sm); display:flex; align-items:center; gap:5px;">
+        ${escapeHtml(c.author_name)} ${isSeller ? '<span class="badge badge-success">البائع</span>' : ''}
+      </span>
+      <span class="muted" style="font-size:var(--fs-xs); flex-shrink:0;">${timeAgoFull(c.created_at)}</span>
+    </div>
+    <p style="font-size:var(--fs-sm); line-height:1.6; margin-bottom:4px;">${escapeHtml(c.body)}</p>
+    ${currentUser ? `<span class="link" style="font-size:var(--fs-xs);" onclick="openReportComment('${c.id}')">إبلاغ</span>` : ''}
+  </div>`;
+}
+async function submitComment() {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  const input = document.getElementById('detail-comment-input');
+  const body = input.value.trim();
+  if (!body) return toast('اكتب تعليقاً');
+  const btn = document.querySelector('#detail-comment-form-box button');
+  btn.disabled = true;
+  try {
+    await api('/listings/' + currentListingId + '/comments', { method: 'POST', body: { body } });
+    renderComments();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+function openReportComment(commentId) {
+  if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
+  openReport('comment', commentId, 'تعليق');
+}
+
+// ---------- similar listings ----------
+function renderSimilarListings(listings) {
+  const section = document.getElementById('similar-listings-section');
+  if (!listings || !listings.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  document.getElementById('similar-listings').innerHTML = listings.map(listingCard).join('');
+  refreshIcons();
 }
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/);
@@ -869,9 +938,10 @@ function openReportAccount() {
   if (!currentSellerProfile) return;
   openReport('account', currentSellerProfile.id, currentSellerProfile.full_name);
 }
+const REPORT_TITLES = { listing: 'الإبلاغ عن إعلان', account: 'الإبلاغ عن حساب', comment: 'الإبلاغ عن تعليق' };
 function openReport(type, id, label) {
   reportTarget = { type, id, label, reason: null };
-  document.getElementById('report-title').textContent = type === 'listing' ? 'الإبلاغ عن إعلان' : 'الإبلاغ عن حساب';
+  document.getElementById('report-title').textContent = REPORT_TITLES[type] || 'الإبلاغ';
   document.getElementById('report-subtitle').textContent = label ? `الجهة: ${label}` : '';
   document.getElementById('report-details').value = '';
   document.getElementById('report-other-box').style.display = 'none';
@@ -1591,10 +1661,14 @@ async function openSeller(id) {
   go('seller');
   const body = document.getElementById('seller-body');
   const listingsEl = document.getElementById('seller-listings');
+  const reviewsEl = document.getElementById('seller-reviews');
+  const reviewFormCard = document.getElementById('seller-review-form-card');
   body.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   listingsEl.innerHTML = '';
+  reviewsEl.innerHTML = '';
+  reviewFormCard.style.display = 'none';
   try {
-    const { seller, listings } = await api('/users/' + id + '/public');
+    const { seller, listings, reviews } = await api('/users/' + id + '/public');
     currentSellerProfile = seller;
     body.innerHTML = `
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px;">
@@ -1609,15 +1683,71 @@ async function openSeller(id) {
       </div>
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:var(--fs-base); font-weight:600; display:flex; align-items:center; gap:5px;">${icon('star', 'icon-sm icon-star-filled')} ${seller.rating_avg.toFixed(1)}</span>
-        <span class="muted">${seller.completed_deals_count} صفقة مكتملة</span>
+        <span class="muted">${seller.reviews_count} تقييم</span>
       </div>
     `;
     listingsEl.innerHTML = listings.length
       ? listings.map(listingCard).join('')
       : '<p class="muted" style="grid-column:1/-1;">لا توجد إعلانات نشطة</p>';
+    reviewsEl.innerHTML = reviews.length
+      ? reviews.map(reviewRow).join('')
+      : '<p class="muted">لا توجد تقييمات بعد</p>';
+    if (seller.can_review) {
+      selectedReviewRating = 0;
+      document.getElementById('seller-review-comment').value = '';
+      hideError('seller-review-error');
+      renderStarPicker();
+      reviewFormCard.style.display = 'block';
+    }
     refreshIcons();
   } catch (err) {
     body.innerHTML = `<p class="muted">تعذّر تحميل البروفايل</p>`;
+  }
+}
+function starsHtml(rating, size) {
+  return [1, 2, 3, 4, 5].map((n) => icon('star', `${size} ${n <= rating ? 'icon-star-filled' : ''}`)).join('');
+}
+function reviewRow(r) {
+  return `<div style="border-bottom:1px solid var(--border); padding:10px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:6px;">
+      <span style="font-weight:600; font-size:var(--fs-sm);">${escapeHtml(r.reviewer_name)}</span>
+      <span class="muted" style="font-size:var(--fs-xs); flex-shrink:0;">${timeAgoFull(r.created_at)}</span>
+    </div>
+    <div style="display:flex; gap:2px; margin-bottom:4px;">${starsHtml(r.rating, 'icon-xs')}</div>
+    ${r.comment ? `<p style="font-size:var(--fs-sm); line-height:1.6;">${escapeHtml(r.comment)}</p>` : ''}
+  </div>`;
+}
+
+// ---------- rate seller (star picker) ----------
+let selectedReviewRating = 0;
+function renderStarPicker() {
+  const el = document.getElementById('seller-star-picker');
+  el.innerHTML = [1, 2, 3, 4, 5]
+    .map((n) => `<span style="cursor:pointer;" onclick="selectReviewRating(${n})">${icon('star', `icon-lg ${n <= selectedReviewRating ? 'icon-star-filled' : ''}`)}</span>`)
+    .join('');
+  refreshIcons();
+}
+function selectReviewRating(n) {
+  selectedReviewRating = n;
+  renderStarPicker();
+}
+async function submitSellerReview() {
+  hideError('seller-review-error');
+  if (!selectedReviewRating) return showError('seller-review-error', 'اختر عدد النجوم');
+  const comment = document.getElementById('seller-review-comment').value.trim();
+  const btn = document.getElementById('seller-review-submit');
+  btn.disabled = true;
+  try {
+    await api('/users/' + currentSellerProfile.id + '/reviews', {
+      method: 'POST',
+      body: { rating: selectedReviewRating, comment },
+    });
+    toast('تم إرسال تقييمك، شكراً لك');
+    openSeller(currentSellerProfile.id);
+  } catch (err) {
+    showError('seller-review-error', err.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 
