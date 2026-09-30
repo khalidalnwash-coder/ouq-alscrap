@@ -28,13 +28,25 @@ const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
 
-const requestedDriver = process.env.STORAGE_DRIVER || 'local';
-const isProduction = process.env.NODE_ENV === 'production';
+// Render's (and most dashboards') "paste a value into this box" UI makes it
+// easy to pick up a trailing space or newline without noticing — which
+// would otherwise break a strict comparison like STORAGE_DRIVER === 'local'
+// silently, or send Cloudinary a credential it then rejects as wrong. Every
+// env var this module reads goes through this first, so a var that's blank
+// after trimming is treated the same as unset (falls back to `fallback`,
+// or undefined) rather than as a present-but-empty value.
+function envTrim(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null) return fallback;
+  const trimmed = raw.trim();
+  return trimmed === '' ? fallback : trimmed;
+}
+
+const requestedDriver = envTrim('STORAGE_DRIVER', 'local');
+const isProduction = envTrim('NODE_ENV') === 'production';
 
 function missingCloudinaryVars() {
-  return ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter(
-    (name) => !(process.env[name] || '').trim()
-  );
+  return ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter((name) => !envTrim(name));
 }
 
 // Mutated in place (never reassigned) so every module that destructured it
@@ -70,8 +82,8 @@ function localDeleteFns(dir, publicBase) {
 }
 
 function setupLocalDriver() {
-  uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
-  const publicBase = process.env.PUBLIC_UPLOADS_BASE_URL || '/uploads';
+  uploadsDir = path.resolve(envTrim('UPLOADS_DIR', './uploads'));
+  const publicBase = envTrim('PUBLIC_UPLOADS_BASE_URL', '/uploads');
   const imagesDir = path.join(uploadsDir, 'images');
   const thumbsDir = path.join(uploadsDir, 'thumbs');
   const videosDir = path.join(uploadsDir, 'videos');
@@ -131,9 +143,9 @@ function setupLocalDriver() {
 function setupCloudinaryDriver() {
   const cloudinary = require('cloudinary').v2;
   cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME.trim(),
-    api_key: process.env.CLOUDINARY_API_KEY.trim(),
-    api_secret: process.env.CLOUDINARY_API_SECRET.trim(),
+    cloud_name: envTrim('CLOUDINARY_CLOUD_NAME'),
+    api_key: envTrim('CLOUDINARY_API_KEY'),
+    api_secret: envTrim('CLOUDINARY_API_SECRET'),
     secure: true,
   });
 
@@ -230,8 +242,8 @@ function setupCloudinaryDriver() {
 // ephemeral local disk, while still serving/cleaning up whatever a
 // previous deploy may have already saved there.
 function setupDisabledDriver(logReason) {
-  uploadsDir = path.resolve(process.env.UPLOADS_DIR || './uploads');
-  const publicBase = process.env.PUBLIC_UPLOADS_BASE_URL || '/uploads';
+  uploadsDir = path.resolve(envTrim('UPLOADS_DIR', './uploads'));
+  const publicBase = envTrim('PUBLIC_UPLOADS_BASE_URL', '/uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
 
   const disabledError = () => {
@@ -269,7 +281,7 @@ if (requestedDriver === 'cloudinary') {
   } else {
     setupLocalDriver();
     storageStatus.active = true;
-    console.log(`[storage] التخزين المحلي مفعّل (وضع التطوير، NODE_ENV=${process.env.NODE_ENV || 'غير محدد'}) — الملفات في ${uploadsDir}`);
+    console.log(`[storage] التخزين المحلي مفعّل (وضع التطوير، NODE_ENV=${envTrim('NODE_ENV') || 'غير محدد'}) — الملفات في ${uploadsDir}`);
   }
 } else {
   throw new Error(`Storage driver "${requestedDriver}" is not implemented (supported: "local", "cloudinary").`);
