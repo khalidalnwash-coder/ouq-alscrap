@@ -67,11 +67,16 @@ router.get(
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await pool.query(
       `SELECT r.*, u.full_name AS reporter_name,
-              CASE WHEN r.target_type = 'listing' THEN l.title ELSE tu.full_name END AS target_label
+              CASE
+                WHEN r.target_type = 'listing' THEN l.title
+                WHEN r.target_type = 'account' THEN tu.full_name
+                ELSE lc.body
+              END AS target_label
        FROM reports r
        JOIN users u ON u.id = r.reporter_id
        LEFT JOIN listings l ON r.target_type = 'listing' AND l.id = r.target_id
        LEFT JOIN users tu ON r.target_type = 'account' AND tu.id = r.target_id
+       LEFT JOIN listing_comments lc ON r.target_type = 'comment' AND lc.id = r.target_id
        ${where}
        ORDER BY r.created_at DESC LIMIT 200`,
       params

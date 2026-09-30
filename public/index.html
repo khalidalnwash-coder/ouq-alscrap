@@ -285,6 +285,21 @@
   <div class="screen" id="screen-detail">
     <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>تفاصيل الإعلان</h2></div>
     <div class="card" id="detail-body"></div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">التعليقات</h3>
+      <div id="detail-comments-list"></div>
+      <div id="detail-comment-form-box" style="display:none;">
+        <textarea id="detail-comment-input" placeholder="اكتب سؤالك للبائع..."></textarea>
+        <button class="btn-outline" onclick="submitComment()">إرسال التعليق</button>
+      </div>
+      <p class="muted" id="detail-comment-login-hint" style="display:none;">سجّل الدخول لإضافة تعليق</p>
+    </div>
+
+    <div id="similar-listings-section" style="display:none;">
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إعلانات مشابهة</h3>
+      <div class="listing-grid" id="similar-listings"></div>
+    </div>
   </div>
 
   <!-- ================= CREATE LISTING ================= -->
@@ -385,6 +400,18 @@
   <div class="screen" id="screen-seller">
     <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>بروفايل البائع</h2></div>
     <div class="card" id="seller-body"></div>
+
+    <div class="card" id="seller-review-form-card" style="display:none;">
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:10px;">قيّم هذا البائع</h3>
+      <div id="seller-star-picker" style="display:flex; gap:6px; margin-bottom:10px;"></div>
+      <textarea id="seller-review-comment" placeholder="تعليق (اختياري)"></textarea>
+      <p class="error-text" id="seller-review-error" style="display:none;"></p>
+      <button class="btn-primary" id="seller-review-submit" onclick="submitSellerReview()">إرسال التقييم</button>
+    </div>
+
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">آراء العملاء</h3>
+    <div class="card" id="seller-reviews"></div>
+
     <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إعلانات البائع</h3>
     <div class="listing-grid" id="seller-listings"></div>
   </div>

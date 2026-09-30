@@ -248,9 +248,9 @@ const VEHICLE_MODELS_BY_MAKE = {
 };
 
 // ---------------------------------------------------------------------------
-// Reporting system (spec Section 10). Two distinct report targets, each with
-// its own reason list. "Commission evasion" is intentionally never a
-// selectable reason on either list — an explicit product decision (commission
+// Reporting system (spec Section 10). Three distinct report targets, each
+// with its own reason list. "Commission evasion" is intentionally never a
+// selectable reason on any list — an explicit product decision (commission
 // compliance is left to the personal pledge in Section 9, not policed here).
 const REPORT_REASONS_LISTING = [
   { value: 'description_mismatch', label: 'الوصف لا يطابق الواقع' },
@@ -264,6 +264,12 @@ const REPORT_REASONS_ACCOUNT = [
   { value: 'fake_images', label: 'صور غير حقيقية أو منسوخة من مصدر آخر' },
   { value: 'took_payment_no_delivery', label: 'استلام مبلغ دون تسليم القطعة أو السيارة' },
   { value: 'abusive_conduct', label: 'تعامل مسيء أو غير لائق' },
+  { value: 'other', label: 'سبب آخر' },
+];
+const REPORT_REASONS_COMMENT = [
+  { value: 'inappropriate_content', label: 'محتوى غير لائق' },
+  { value: 'spam', label: 'إعلان أو سبام' },
+  { value: 'harassment', label: 'إساءة أو تنمّر' },
   { value: 'other', label: 'سبب آخر' },
 ];
 
@@ -305,6 +311,7 @@ module.exports = {
   VEHICLE_MODELS_BY_MAKE,
   REPORT_REASONS_LISTING,
   REPORT_REASONS_ACCOUNT,
+  REPORT_REASONS_COMMENT,
   COMMISSION_RATE,
   BANK_ACCOUNT,
   ARCHIVE_WARNING_DAYS,
