@@ -10,15 +10,18 @@ const adminRoutes = require('./routes/admin');
 const reportsRoutes = require('./routes/reports');
 const transactionsRoutes = require('./routes/transactions');
 const conversationsRoutes = require('./routes/conversations');
-const { uploadsDir } = require('./utils/storage');
+const { uploadsDir, storageStatus } = require('./utils/storage');
 const { runArchivalSweep } = require('./jobs/archival');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Only served under STORAGE_DRIVER=local — the cloudinary driver serves
-// media directly from Cloudinary's own URLs, so there's no local uploadsDir.
+// uploadsDir is set whenever local disk is involved at all — the real
+// "local" driver, or the "disabled" safety state, which still serves (and
+// can delete) whatever a previous deploy already saved there even though it
+// refuses to write anything new. Only unset when Cloudinary is genuinely
+// active, since media is then served directly from Cloudinary's own URLs.
 if (uploadsDir) app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(path.join(__dirname, '..', '..', 'public')));
 
@@ -30,7 +33,10 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/conversations', conversationsRoutes);
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+// storage below reports the media-upload driver actually running — never
+// secrets, just enough to confirm from a browser/curl whether Cloudinary is
+// really active without digging through Render's logs. See utils/storage.js.
+app.get('/api/health', (_req, res) => res.json({ ok: true, storage: storageStatus }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
