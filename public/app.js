@@ -427,6 +427,21 @@ async function confirmForgotOtp() {
   }
 }
 
+// Fallback for a listing photo that fails to load (e.g. an old Render-local
+// upload from before Cloudinary was wired up, now gone) — swap it for the
+// same "box" placeholder already used for a listing with no photo at all,
+// instead of the browser's broken-image icon.
+function handleImgError(imgEl) {
+  const div = document.createElement('div');
+  div.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
+  div.innerHTML = icon('package', imgEl.dataset.fallbackSize || 'icon-lg');
+  imgEl.replaceWith(div);
+  refreshIcons();
+}
+function imgWithFallback(url, { style = '', fallbackSize = 'icon-lg' } = {}) {
+  return `<img src="${escapeHtml(url)}" alt="" style="${style}" data-fallback-size="${fallbackSize}" onerror="handleImgError(this)">`;
+}
+
 // ---------- listing cards ----------
 const LISTING_STATUS_LABELS = { active: 'نشط', archived: 'مؤرشف', sold: 'مباع' };
 const BUMP_COOLDOWN_HOURS = 24;
@@ -434,7 +449,7 @@ const ARCHIVE_WARNING_DAYS = 45;
 const ARCHIVE_DAYS = 60;
 function listingCard(l, opts = {}) {
   const thumb = l.thumbnail_url
-    ? `<img src="${l.thumbnail_url}" alt="">`
+    ? imgWithFallback(l.thumbnail_url)
     : icon('package', 'icon-lg');
   const statusBadge = opts.showStatus
     ? `<div class="badge ${l.status === 'active' ? 'badge-success' : 'badge-warning'}" style="margin-top:6px;">${escapeHtml(LISTING_STATUS_LABELS[l.status] || l.status)}</div>`
@@ -706,36 +721,24 @@ function openVehicleCreateWhole() {
 
 // ---------- listing detail ----------
 // Order (spec): العنوان -> المدينة + وقت النشر -> اسم البائع -> [سعر/تفاصيل] ->
-// الوصف -> الصور و/أو الفيديو -> زر تواصل (اتصال / رسالة خاصة).
+// الوصف -> الصور ثم الفيديو (كلها ظاهرة معاً بالتمرير، بدون تبويبات تبديل)
+// -> زر تواصل (اتصال / رسالة خاصة).
 let currentListingDetail = null;
 let currentSellerDetail = null;
-let currentDetailMedia = [];
 
-function detailMediaItemHtml(m) {
-  if (m.type === 'video') {
-    return `<video src="${m.url}" controls style="width:100%; height:100%; object-fit:cover;"></video>`;
-  }
-  return `<img src="${m.url}" style="width:100%; height:100%; object-fit:cover;">`;
-}
-function selectDetailMedia(i) {
-  const main = document.getElementById('detail-media-main');
-  if (main && currentDetailMedia[i]) main.innerHTML = detailMediaItemHtml(currentDetailMedia[i]);
-}
 function renderDetailMedia(media) {
-  currentDetailMedia = media;
   if (!media.length) {
     return `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${icon('image', 'icon-xl')}</div>`;
   }
-  const mainHtml = `<div class="listing-thumb" id="detail-media-main" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${detailMediaItemHtml(media[0])}</div>`;
-  if (media.length === 1) return mainHtml;
-  const stripHtml = `<div class="thumb-strip">${media.map((m, i) => `
-    <div class="thumb" style="cursor:pointer;" onclick="selectDetailMedia(${i})">
-      ${m.type === 'video' && m.thumbnail_url ? `<img src="${m.thumbnail_url}">` : ''}
-      ${m.type === 'video' && !m.thumbnail_url ? `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--blue-light);">${icon('video', 'icon-sm')}</div>` : ''}
-      ${m.type === 'image' ? `<img src="${m.thumbnail_url || m.url}">` : ''}
-      ${m.type === 'video' ? `<span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.25); pointer-events:none;">${icon('play', 'icon-sm')}</span>` : ''}
-    </div>`).join('')}</div>`;
-  return mainHtml + stripHtml;
+  const images = media.filter((m) => m.type === 'image');
+  const video = media.find((m) => m.type === 'video');
+  let html = images
+    .map((m) => `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${imgWithFallback(m.url, { style: 'width:100%; height:100%; object-fit:cover;', fallbackSize: 'icon-xl' })}</div>`)
+    .join('');
+  if (video) {
+    html += `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;"><video src="${video.url}" controls style="width:100%; height:100%; object-fit:cover;"></video></div>`;
+  }
+  return html;
 }
 function callSeller() {
   if (currentSellerDetail && currentSellerDetail.phone) {
