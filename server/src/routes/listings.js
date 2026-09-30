@@ -18,6 +18,7 @@ const {
   VEHICLE_MODELS_BY_MAKE,
   REPORT_REASONS_LISTING,
   REPORT_REASONS_ACCOUNT,
+  REPORT_REASONS_COMMENT,
   COMMISSION_RATE,
   BANK_ACCOUNT,
   ARCHIVE_WARNING_DAYS,
@@ -118,7 +119,7 @@ router.get('/meta', (_req, res) => {
         { label: VEHICLE_LABELS[cat], makes: VEHICLE_MAKES[cat], models_by_make: VEHICLE_MODELS_BY_MAKE[cat] },
       ])
     ),
-    report_reasons: { listing: REPORT_REASONS_LISTING, account: REPORT_REASONS_ACCOUNT },
+    report_reasons: { listing: REPORT_REASONS_LISTING, account: REPORT_REASONS_ACCOUNT, comment: REPORT_REASONS_COMMENT },
     commission_rate: COMMISSION_RATE,
     bank_account: BANK_ACCOUNT,
     bump_cooldown_hours: BUMP_COOLDOWN_HOURS,
@@ -215,12 +216,25 @@ router.get(
 
     const [withMedia] = await attachMedia([listing]);
     const sellerRes = await pool.query(
-      `SELECT id, full_name, account_type, is_verified_trader, rating_avg, completed_deals_count, created_at,
+      `SELECT id, full_name, account_type, is_verified_trader, rating_avg, reviews_count, completed_deals_count, created_at,
               phone_country_code, phone_number, phone_visible
        FROM users WHERE id = $1`,
       [listing.seller_id]
     );
     const seller = sellerRes.rows[0];
+
+    // Similar listings (spec-adjacent addition): same section (category +
+    // whole/part) so a buyer browsing a whole car only sees other whole
+    // cars, never parts — with listings sharing the same manufacturer
+    // sorted first when one is set, recency as the tiebreaker otherwise.
+    const similarRes = await pool.query(
+      `SELECT * FROM listings
+       WHERE status = 'active' AND id != $1 AND category = $2 AND listing_type = $3
+       ORDER BY (compatible_make IS NOT NULL AND compatible_make = $4) DESC, last_updated_at DESC
+       LIMIT 6`,
+      [listing.id, listing.category, listing.listing_type, listing.compatible_make]
+    );
+    const similarWithMedia = await attachMedia(similarRes.rows);
 
     res.json({
       listing: {
@@ -256,6 +270,7 @@ router.get(
             account_type: seller.account_type,
             is_verified_trader: seller.is_verified_trader,
             rating_avg: Number(seller.rating_avg),
+            reviews_count: seller.reviews_count,
             completed_deals_count: seller.completed_deals_count,
             member_since: seller.created_at,
             // Only revealed when the seller hasn't hidden it (profile setting)
@@ -263,7 +278,52 @@ router.get(
             phone: seller.phone_visible ? `${seller.phone_country_code}${seller.phone_number}` : null,
           }
         : null,
+      similar_listings: similarWithMedia.map(listingCard),
     });
+  })
+);
+
+const MAX_COMMENT_LENGTH = 1000;
+
+// GET /api/listings/:id/comments — public Q&A thread under a listing,
+// oldest first (a conversation reads top-to-bottom). No auth required to
+// read — only to post (see POST below).
+router.get(
+  '/:id/comments',
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT id FROM listings WHERE id = $1', [req.params.id]);
+    if (!listingRes.rows[0]) return res.status(404).json({ error: 'الإعلان غير موجود' });
+
+    const result = await pool.query(
+      `SELECT c.id, c.body, c.author_id, c.created_at, u.full_name AS author_name
+       FROM listing_comments c JOIN users u ON u.id = c.author_id
+       WHERE c.listing_id = $1 ORDER BY c.created_at ASC LIMIT 200`,
+      [req.params.id]
+    );
+    res.json({ comments: result.rows });
+  })
+);
+
+router.post(
+  '/:id/comments',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT id FROM listings WHERE id = $1', [req.params.id]);
+    if (!listingRes.rows[0]) return res.status(404).json({ error: 'الإعلان غير موجود' });
+
+    const body = ((req.body && req.body.body) || '').trim();
+    if (!body) return res.status(400).json({ error: 'اكتب تعليقاً' });
+    if (body.length > MAX_COMMENT_LENGTH) {
+      return res.status(400).json({ error: `التعليق أطول من الحد المسموح (${MAX_COMMENT_LENGTH} حرف)` });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO listing_comments (listing_id, author_id, body) VALUES ($1,$2,$3)
+       RETURNING id, body, author_id, created_at`,
+      [req.params.id, req.userId, body]
+    );
+    const authorRes = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.userId]);
+    res.status(201).json({ comment: { ...result.rows[0], author_name: authorRes.rows[0].full_name } });
   })
 );
 
