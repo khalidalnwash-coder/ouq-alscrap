@@ -441,6 +441,16 @@ function handleImgError(imgEl) {
 function imgWithFallback(url, { style = '', fallbackSize = 'icon-lg' } = {}) {
   return `<img src="${escapeHtml(url)}" alt="" style="${style}" data-fallback-size="${fallbackSize}" onerror="handleImgError(this)">`;
 }
+// Same idea as handleImgError, for a <video> whose source fails to load —
+// the browser's own broken-video box (a black rectangle with a "no video"
+// icon) is replaced with the same "box" placeholder used everywhere else.
+function handleVideoError(videoEl) {
+  const div = document.createElement('div');
+  div.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
+  div.innerHTML = icon('package', videoEl.dataset.fallbackSize || 'icon-lg');
+  videoEl.replaceWith(div);
+  refreshIcons();
+}
 
 // ---------- listing cards ----------
 const LISTING_STATUS_LABELS = { active: 'نشط', archived: 'مؤرشف', sold: 'مباع' };
@@ -456,19 +466,29 @@ function listingCard(l, opts = {}) {
     : '';
 
   let actionsHtml = '';
-  if (opts.showActions && l.status === 'active') {
-    const hoursSince = (Date.now() - new Date(l.last_updated_at).getTime()) / 3600000;
-    const daysSince = Math.floor(hoursSince / 24);
-    const canBump = hoursSince >= BUMP_COOLDOWN_HOURS;
-    const warnHtml = daysSince >= ARCHIVE_WARNING_DAYS
-      ? `<div class="muted" style="font-size:var(--fs-xs); color:var(--warning); margin-top:4px; display:flex; align-items:center; gap:3px;">${icon('alert-triangle', 'icon-xs')} سيُؤرشف خلال ${Math.max(ARCHIVE_DAYS - daysSince, 0)} يوم</div>`
-      : '';
-    actionsHtml = `${warnHtml}
-      <button class="btn-ghost card-action-btn" ${canBump ? '' : 'disabled'} onclick="event.stopPropagation(); bumpListing('${l.id}')">
-        ${canBump ? 'حدّث الآن' : `متاح بعد ${Math.max(Math.ceil(BUMP_COOLDOWN_HOURS - hoursSince), 0)} س`}
-      </button>`;
-  } else if (opts.showActions && l.status === 'archived') {
-    actionsHtml = `<button class="btn-ghost card-action-btn" style="color:var(--blue);" onclick="event.stopPropagation(); restoreListing('${l.id}')">${icon('rotate-ccw', 'icon-xs')} استرجاع</button>`;
+  if (opts.showActions) {
+    const ownerButtons = `
+      <div style="display:flex; gap:6px; margin-top:4px;">
+        <button class="btn-ghost card-action-btn" style="flex:1;" onclick="event.stopPropagation(); openEditListing('${l.id}')">${icon('pencil', 'icon-xs')} تعديل</button>
+        <button class="btn-ghost card-action-btn" style="flex:1; color:var(--danger);" onclick="event.stopPropagation(); deleteListing('${l.id}')">${icon('trash-2', 'icon-xs')} حذف</button>
+      </div>`;
+    if (l.status === 'active') {
+      const hoursSince = (Date.now() - new Date(l.last_updated_at).getTime()) / 3600000;
+      const daysSince = Math.floor(hoursSince / 24);
+      const canBump = hoursSince >= BUMP_COOLDOWN_HOURS;
+      const warnHtml = daysSince >= ARCHIVE_WARNING_DAYS
+        ? `<div class="muted" style="font-size:var(--fs-xs); color:var(--warning); margin-top:4px; display:flex; align-items:center; gap:3px;">${icon('alert-triangle', 'icon-xs')} سيُؤرشف خلال ${Math.max(ARCHIVE_DAYS - daysSince, 0)} يوم</div>`
+        : '';
+      actionsHtml = `${warnHtml}
+        <button class="btn-ghost card-action-btn" ${canBump ? '' : 'disabled'} onclick="event.stopPropagation(); bumpListing('${l.id}')">
+          ${canBump ? 'حدّث الآن' : `متاح بعد ${Math.max(Math.ceil(BUMP_COOLDOWN_HOURS - hoursSince), 0)} س`}
+        </button>
+        ${ownerButtons}`;
+    } else if (l.status === 'archived') {
+      actionsHtml = `<button class="btn-ghost card-action-btn" style="color:var(--blue);" onclick="event.stopPropagation(); restoreListing('${l.id}')">${icon('rotate-ccw', 'icon-xs')} استرجاع</button>${ownerButtons}`;
+    } else {
+      actionsHtml = ownerButtons;
+    }
   }
 
   return `<div class="listing-card" onclick="openDetail('${l.id}')">
@@ -496,6 +516,20 @@ async function restoreListing(id) {
     await api('/listings/' + id + '/restore', { method: 'PATCH' });
     toast('تم استرجاع الإعلان');
     renderMyListings();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function deleteListing(id) {
+  if (!confirm('هل أنت متأكد من حذف الإعلان؟')) return;
+  try {
+    await api('/listings/' + id, { method: 'DELETE' });
+    toast('تم حذف الإعلان');
+    if (document.querySelector('.screen.active').id === 'screen-detail') {
+      goBack();
+    } else {
+      renderMyListings();
+    }
   } catch (err) {
     toast(err.message);
   }
@@ -736,7 +770,7 @@ function renderDetailMedia(media) {
     .map((m) => `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;">${imgWithFallback(m.url, { style: 'width:100%; height:100%; object-fit:cover;', fallbackSize: 'icon-xl' })}</div>`)
     .join('');
   if (video) {
-    html += `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;"><video src="${video.url}" controls style="width:100%; height:100%; object-fit:cover;"></video></div>`;
+    html += `<div class="listing-thumb" style="height:220px; border-radius:var(--radius-sm); margin-bottom:8px;"><video src="${escapeHtml(video.url)}" controls data-fallback-size="icon-xl" onerror="handleVideoError(this)" style="width:100%; height:100%; object-fit:cover;"></video></div>`;
   }
   return html;
 }
@@ -771,7 +805,11 @@ async function openDetail(id) {
       ? `<p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">${icon('bike', 'icon-xs')} ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>`
       : (compatBits || yearRange ? `<p class="muted" style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">${icon('wrench', 'icon-xs')} ${escapeHtml(compatBits)} ${escapeHtml(yearRange)}</p>` : '');
 
-    const contactRow = isOwnListing ? '' : `
+    const contactRow = isOwnListing ? `
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button class="btn-outline" style="flex:1;" onclick="openEditListing('${listing.id}')">${icon('pencil', 'icon-sm')} تعديل الإعلان</button>
+        <button class="btn-outline" style="flex:1; color:var(--danger); border-color:var(--danger);" onclick="deleteListing('${listing.id}')">${icon('trash-2', 'icon-sm')} حذف</button>
+      </div>` : `
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         ${seller.phone ? `<button class="btn-primary" style="flex:1;" onclick="callSeller()">${icon('phone', 'icon-sm')} اتصال</button>` : ''}
         <button class="btn-${seller.phone ? 'outline' : 'primary'}" style="flex:1;" onclick="openConversationFromListing()">${icon('message-circle', 'icon-sm')} رسالة خاصة</button>
@@ -1409,6 +1447,141 @@ async function publishListing() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'نشر الإعلان';
+  }
+}
+
+// ---------- edit listing ----------
+// Narrow scope on purpose: title/description/price and images/video only —
+// never category, compat fields, or country/city (see the PATCH route).
+let editListingId = null;
+let editExistingImages = [];
+let editExistingVideo = null;
+let editRemoveMediaIds = [];
+let editNewImages = [];
+let editNewVideo = null;
+
+async function openEditListing(id) {
+  editListingId = id;
+  editRemoveMediaIds = [];
+  editNewImages = [];
+  editNewVideo = null;
+  go('edit-listing');
+  document.getElementById('el-title').value = '';
+  document.getElementById('el-desc').value = '';
+  document.getElementById('el-price').value = '';
+  document.getElementById('el-new-images').innerHTML = '';
+  document.getElementById('el-new-video').innerHTML = '';
+  hideError('el-error');
+  try {
+    const { listing } = await api('/listings/' + id);
+    document.getElementById('el-title').value = listing.title;
+    document.getElementById('el-desc').value = listing.description || '';
+    document.getElementById('el-price').value = listing.price;
+    editExistingImages = listing.media.filter((m) => m.type === 'image');
+    editExistingVideo = listing.media.find((m) => m.type === 'video') || null;
+    renderEditExistingMedia();
+  } catch (err) {
+    toast(err.message);
+    goBack();
+  }
+}
+function renderEditExistingMedia() {
+  document.getElementById('el-existing-images').innerHTML = editExistingImages
+    .map((m) => `<div class="thumb">${imgWithFallback(m.thumbnail_url || m.url, { style: 'width:100%; height:100%; object-fit:cover;' })}<span class="rm" onclick="removeExistingMedia('${m.id}')">${icon('x')}</span></div>`)
+    .join('');
+  document.getElementById('el-existing-video').innerHTML = editExistingVideo
+    ? `<div class="thumb"><video src="${editExistingVideo.url}" muted onerror="handleVideoError(this)" style="width:100%; height:100%; object-fit:cover;"></video><span class="rm" onclick="removeExistingMedia('${editExistingVideo.id}')">${icon('x')}</span></div>`
+    : '<p class="muted">لا يوجد فيديو حالياً</p>';
+  refreshIcons();
+}
+function removeExistingMedia(mediaId) {
+  editRemoveMediaIds.push(mediaId);
+  editExistingImages = editExistingImages.filter((m) => m.id !== mediaId);
+  if (editExistingVideo && editExistingVideo.id === mediaId) editExistingVideo = null;
+  renderEditExistingMedia();
+}
+async function onEditImagesSelected(e) {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  for (const f of files) {
+    if (editExistingImages.length + editNewImages.length >= MAX_IMAGES) { toast(`الحد الأقصى ${MAX_IMAGES} صور`); break; }
+    if (!['image/jpeg', 'image/png'].includes(f.type)) { toast('الصور يجب أن تكون JPG أو PNG'); continue; }
+    if (f.size > MAX_ORIGINAL_IMAGE_MB * 1024 * 1024) { toast(`الصورة "${f.name}" كبيرة جداً`); continue; }
+    let compressed;
+    try {
+      compressed = await compressImageFile(f);
+    } catch {
+      toast(`تعذّر معالجة الصورة "${f.name}"، جرّب صورة أخرى`);
+      continue;
+    }
+    if (compressed.size > MAX_IMAGE_MB * 1024 * 1024) { toast(`الصورة "${f.name}" كبيرة جداً حتى بعد الضغط`); continue; }
+    editNewImages.push(compressed);
+    renderEditNewImages();
+  }
+}
+function renderEditNewImages() {
+  document.getElementById('el-new-images').innerHTML = editNewImages
+    .map((f, i) => `<div class="thumb"><img src="${URL.createObjectURL(f)}"><span class="rm" onclick="removeEditNewImage(${i})">${icon('x')}</span></div>`)
+    .join('');
+  refreshIcons();
+}
+function removeEditNewImage(i) {
+  editNewImages.splice(i, 1);
+  renderEditNewImages();
+}
+async function onEditVideoSelected(e) {
+  const file = (e.target.files || [])[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!VIDEO_MIME_TYPES.includes(file.type)) return toast('صيغة الفيديو غير مدعومة (MP4 أو MOV أو WebM فقط)');
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) return toast(`حجم الفيديو أكبر من ${MAX_VIDEO_MB} ميجا`);
+  let duration;
+  try {
+    duration = await readVideoDuration(file);
+  } catch {
+    return toast('تعذّر قراءة الفيديو، جرّب ملفاً آخر');
+  }
+  if (duration > MAX_VIDEO_DURATION_SECONDS + 1) return toast('مدة الفيديو يجب ألا تتجاوز دقيقة واحدة');
+  editNewVideo = file;
+  renderEditNewVideo();
+}
+function renderEditNewVideo() {
+  document.getElementById('el-new-video').innerHTML = editNewVideo
+    ? `<div class="thumb"><video src="${URL.createObjectURL(editNewVideo)}" muted style="width:100%; height:100%; object-fit:cover;"></video><span class="rm" onclick="removeEditNewVideo()">${icon('x')}</span></div>`
+    : '';
+  refreshIcons();
+}
+function removeEditNewVideo() {
+  editNewVideo = null;
+  renderEditNewVideo();
+}
+async function submitEditListing() {
+  hideError('el-error');
+  const title = document.getElementById('el-title').value.trim();
+  const price = document.getElementById('el-price').value;
+  if (!title) return showError('el-error', 'عنوان الإعلان مطلوب');
+  if (!price || Number(price) <= 0) return showError('el-error', 'سعر غير صالح');
+
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('description', document.getElementById('el-desc').value.trim());
+  fd.append('price', price);
+  fd.append('remove_media_ids', JSON.stringify(editRemoveMediaIds));
+  editNewImages.forEach((f) => fd.append('images', f));
+  if (editNewVideo) fd.append('video', editNewVideo);
+
+  const btn = document.getElementById('el-submit');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+  try {
+    await api('/listings/' + editListingId, { method: 'PATCH', body: fd, isForm: true });
+    toast('تم حفظ التعديلات');
+    openDetail(editListingId);
+  } catch (err) {
+    showError('el-error', err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'حفظ التعديلات';
   }
 }
 

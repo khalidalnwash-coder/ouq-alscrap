@@ -358,7 +358,7 @@
         اضغط لإضافة صور
         <small>حتى 10 صور — يتم ضغطها تلقائياً قبل الرفع</small>
       </div>
-      <input id="cl-images" type="file" accept="image/jpeg,image/png" multiple style="display:none" onchange="onImagesSelected(event)">
+      <input id="cl-images" type="file" accept="image/*" multiple style="display:none" onchange="onImagesSelected(event)">
       <div class="thumb-strip" id="cl-thumbs"></div>
 
       <label>الفيديو (اختياري)</label>
@@ -367,7 +367,7 @@
         اضغط لإضافة فيديو
         <small>فيديو واحد فقط، حتى دقيقة</small>
       </div>
-      <input id="cl-video" type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none" onchange="onVideoSelected(event)">
+      <input id="cl-video" type="file" accept="video/*" style="display:none" onchange="onVideoSelected(event)">
       <div class="thumb-strip" id="cl-video-preview"></div>
 
       <label>الوصف والمميزات</label>
@@ -378,6 +378,48 @@
 
       <p class="error-text" id="cl-error" style="display:none;"></p>
       <button class="btn-primary" id="cl-submit" onclick="publishListing()">نشر الإعلان</button>
+    </div>
+  </div>
+
+  <!-- ================= EDIT LISTING ================= -->
+  <div class="screen" id="screen-edit-listing">
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>تعديل الإعلان</h2></div>
+    <div class="card">
+      <label>عنوان الإعلان</label>
+      <input id="el-title">
+
+      <label>الوصف والمميزات</label>
+      <textarea id="el-desc" placeholder="اكتب وصف حر عن حالة القطعة والمميزات..."></textarea>
+
+      <label>السعر</label>
+      <input id="el-price" type="number" placeholder="0">
+
+      <label>الصور الحالية</label>
+      <div class="thumb-strip" id="el-existing-images"></div>
+
+      <label>إضافة صور جديدة</label>
+      <div class="upload-drop" onclick="document.getElementById('el-images').click()">
+        <i data-lucide="camera" class="icon"></i>
+        اضغط لإضافة صور
+        <small>حتى 10 صور بالمجموع</small>
+      </div>
+      <input id="el-images" type="file" accept="image/*" multiple style="display:none" onchange="onEditImagesSelected(event)">
+      <div class="thumb-strip" id="el-new-images"></div>
+
+      <label>الفيديو الحالي</label>
+      <div class="thumb-strip" id="el-existing-video"></div>
+
+      <label>تغيير الفيديو (اختياري)</label>
+      <div class="upload-drop" onclick="document.getElementById('el-video').click()">
+        <i data-lucide="video" class="icon"></i>
+        اضغط لإضافة فيديو جديد
+        <small>يستبدل الفيديو الحالي، حتى دقيقة</small>
+      </div>
+      <input id="el-video" type="file" accept="video/*" style="display:none" onchange="onEditVideoSelected(event)">
+      <div class="thumb-strip" id="el-new-video"></div>
+
+      <p class="error-text" id="el-error" style="display:none;"></p>
+      <button class="btn-primary" id="el-submit" onclick="submitEditListing()">حفظ التعديلات</button>
     </div>
   </div>
 

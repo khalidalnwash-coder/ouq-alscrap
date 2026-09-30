@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { pool } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
-const { saveImage, saveVideo, deleteVideo } = require('../utils/storage');
+const { saveImage, deleteImage, saveVideo, deleteVideo } = require('../utils/storage');
 const { asyncHandler } = require('../utils/asyncHandler');
 const {
   COUNTRIES,
@@ -63,6 +63,14 @@ const uploadMedia = upload.fields([
   { name: 'images', maxCount: MAX_IMAGES },
   { name: 'video', maxCount: MAX_VIDEOS },
 ]);
+
+function deleteMediaRow(m) {
+  if (m.type === 'video') {
+    deleteVideo({ originalUrl: m.original_url, storageKey: m.storage_key });
+  } else {
+    deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url, storageKey: m.storage_key });
+  }
+}
 
 async function attachMedia(listings) {
   if (!listings.length) return listings;
@@ -243,6 +251,7 @@ router.get(
         last_updated_at: withMedia.last_updated_at,
         created_at: withMedia.created_at,
         media: withMedia.media.map((m) => ({
+          id: m.id,
           type: m.type,
           url: m.original_url,
           thumbnail_url: m.thumbnail_url,
@@ -485,6 +494,164 @@ router.patch(
       [req.params.id]
     );
     res.json({ ok: true });
+  })
+);
+
+// DELETE /api/listings/:id — the owner removes their own listing entirely,
+// same cleanup the 90-day auto hard-delete sweep already does (see
+// jobs/archival.js), just triggered on demand instead of by the timer:
+// every image/video is removed from storage, then the row itself (which
+// cascades to listing_media/conversations/messages/transactions tied to it,
+// per the existing FK definitions — unchanged, pre-existing behavior).
+router.delete(
+  '/:id',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id FROM listings WHERE id = $1', [req.params.id]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+
+    const mediaRes = await pool.query(
+      'SELECT type, original_url, thumbnail_url, storage_key FROM listing_media WHERE listing_id = $1',
+      [req.params.id]
+    );
+    for (const m of mediaRes.rows) deleteMediaRow(m);
+
+    await pool.query('DELETE FROM listings WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  })
+);
+
+// PATCH /api/listings/:id — edit the owner's own listing. Deliberately
+// narrow scope: title/description/price and images/video only — never
+// category, compat fields, or country/city (those drive which screens and
+// filters a listing shows under, and changing them mid-life is out of
+// scope here). A new video always replaces any existing one (one video
+// slot per listing); images are removed via remove_media_ids and/or added
+// via the same "images"/"video" fields the create flow uses.
+router.patch(
+  '/:id',
+  requireAuth,
+  uploadMedia,
+  asyncHandler(async (req, res) => {
+    const listingRes = await pool.query('SELECT seller_id FROM listings WHERE id = $1', [req.params.id]);
+    const listing = listingRes.rows[0];
+    if (!listing) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    if (listing.seller_id !== req.userId) return res.status(403).json({ error: 'هذا الإعلان ليس لك' });
+
+    const { title, description, price, remove_media_ids } = req.body || {};
+
+    const updates = [];
+    const params = [];
+    if (title !== undefined) {
+      if (!title.trim()) return res.status(400).json({ error: 'عنوان الإعلان مطلوب' });
+      params.push(title.trim());
+      updates.push(`title = $${params.length}`);
+    }
+    if (description !== undefined) {
+      params.push(description.trim() || null);
+      updates.push(`description = $${params.length}`);
+    }
+    if (price !== undefined) {
+      const priceNum = Number(price);
+      if (!Number.isFinite(priceNum) || priceNum <= 0) {
+        return res.status(400).json({ error: 'سعر غير صالح' });
+      }
+      params.push(priceNum);
+      updates.push(`price = $${params.length}`);
+    }
+
+    let removeIds = [];
+    if (remove_media_ids) {
+      try {
+        removeIds = JSON.parse(remove_media_ids);
+        if (!Array.isArray(removeIds)) throw new Error('not an array');
+      } catch {
+        return res.status(400).json({ error: 'صيغة الصور المطلوب حذفها غير صالحة' });
+      }
+    }
+
+    const imageFiles = (req.files && req.files.images) || [];
+    const videoFile = req.files && req.files.video && req.files.video[0];
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      if (updates.length) {
+        params.push(req.params.id);
+        await client.query(`UPDATE listings SET ${updates.join(', ')} WHERE id = $${params.length}`, params);
+      }
+
+      const mediaRes = await client.query(
+        'SELECT id, type, original_url, thumbnail_url, storage_key, order_index FROM listing_media WHERE listing_id = $1 ORDER BY order_index ASC',
+        [req.params.id]
+      );
+      const existingMedia = mediaRes.rows;
+
+      const existingIds = new Set(existingMedia.map((m) => m.id));
+      for (const id of removeIds) {
+        if (!existingIds.has(id)) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'صورة/فيديو غير موجود ضمن هذا الإعلان' });
+        }
+      }
+
+      const removeIdSet = new Set(removeIds);
+      // A newly uploaded video always replaces any existing one, regardless
+      // of whether the client also listed the old one in remove_media_ids.
+      const existingVideo = existingMedia.find((m) => m.type === 'video');
+      if (videoFile && existingVideo) removeIdSet.add(existingVideo.id);
+
+      const toRemove = existingMedia.filter((m) => removeIdSet.has(m.id));
+      const remainingImagesCount = existingMedia.filter((m) => m.type === 'image' && !removeIdSet.has(m.id)).length;
+      if (remainingImagesCount + imageFiles.length > MAX_IMAGES) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `الحد الأقصى ${MAX_IMAGES} صور` });
+      }
+
+      if (toRemove.length) {
+        await client.query('DELETE FROM listing_media WHERE id = ANY($1)', [toRemove.map((m) => m.id)]);
+      }
+
+      let orderIndex = existingMedia.reduce((max, m) => Math.max(max, m.order_index), -1) + 1;
+      for (const file of imageFiles) {
+        const { originalUrl, thumbnailUrl, storageKey } = await saveImage(file.buffer);
+        await client.query(
+          `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, storage_key, order_index)
+           VALUES ($1,'image',$2,$3,$4,$5)`,
+          [req.params.id, originalUrl, thumbnailUrl, storageKey || null, orderIndex++]
+        );
+      }
+
+      if (videoFile) {
+        const { originalUrl, thumbnailUrl, storageKey, durationSeconds } = await saveVideo(videoFile.buffer, videoFile.mimetype);
+        if (durationSeconds != null && durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
+          deleteVideo({ storageKey });
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'مدة الفيديو يجب ألا تتجاوز دقيقة واحدة' });
+        }
+        await client.query(
+          `INSERT INTO listing_media (listing_id, type, original_url, thumbnail_url, storage_key, duration_seconds, order_index)
+           VALUES ($1,'video',$2,$3,$4,$5,$6)`,
+          [req.params.id, originalUrl, thumbnailUrl, storageKey || null, durationSeconds, orderIndex++]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      // Best-effort cleanup of removed media's storage files, done after
+      // commit so a storage hiccup never rolls back an otherwise-successful edit.
+      for (const m of toRemove) deleteMediaRow(m);
+
+      res.json({ ok: true });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   })
 );
 
