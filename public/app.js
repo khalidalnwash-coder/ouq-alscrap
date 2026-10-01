@@ -38,6 +38,29 @@ const TOKEN_KEY = 'alscrap_token';
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
 
+// ---------- theme (light / dark / auto) ----------
+const THEME_KEY = 'alscrap_theme';
+let themePreference = localStorage.getItem(THEME_KEY) || 'auto';
+const darkMediaQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function applyTheme() {
+  const resolved = themePreference === 'auto'
+    ? ((darkMediaQuery && darkMediaQuery.matches) ? 'dark' : 'light')
+    : themePreference;
+  document.documentElement.setAttribute('data-theme', resolved);
+  const rows = document.querySelectorAll('#theme-toggle .toggle-opt');
+  rows.forEach((el) => el.classList.toggle('selected', el.dataset.theme === themePreference));
+}
+function setThemePreference(value) {
+  themePreference = value;
+  localStorage.setItem(THEME_KEY, value);
+  applyTheme();
+}
+if (darkMediaQuery) {
+  darkMediaQuery.addEventListener('change', () => { if (themePreference === 'auto') applyTheme(); });
+}
+applyTheme();
+
 // ---------- api helper ----------
 async function api(path, { method = 'GET', body, isForm = false } = {}) {
   const headers = {};
@@ -1780,6 +1803,7 @@ async function renderProfile() {
   document.getElementById('notif-state').textContent = currentUser.notifications_enabled ? 'مفعّلة' : 'معطّلة';
   document.getElementById('phone-visible-state').textContent = currentUser.phone_visible ? 'ظاهر' : 'مخفي';
   document.getElementById('admin-row').style.display = currentUser.is_admin ? 'flex' : 'none';
+  applyTheme();
 }
 async function toggleNotifRow() {
   try {

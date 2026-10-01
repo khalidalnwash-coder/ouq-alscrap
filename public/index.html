@@ -94,7 +94,7 @@
           <p style="font-size:var(--fs-base); font-weight:600;">عبر البريد الإلكتروني</p>
           <p class="muted" style="font-size:var(--fs-xs);">إذا ما كان واتسابك مفعّل بهذا الرقم</p>
         </div>
-        <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid #C9CDD3;"></div>
+        <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border);"></div>
       </div>
 
       <button class="btn-primary" onclick="sendOtpChosen()">إرسال الكود</button>
@@ -512,6 +512,14 @@
       <div style="display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:4px;">
         <div class="avatar" id="profile-avatar"></div>
         <div><p style="font-size:var(--fs-base); font-weight:700;" id="profile-name"></p><p class="muted" id="profile-email"></p></div>
+      </div>
+      <div style="padding:13px 0; border-bottom:1px solid var(--border);">
+        <label style="margin-bottom:9px;">مظهر التطبيق</label>
+        <div class="toggle-group" id="theme-toggle" style="margin-bottom:0;">
+          <div class="toggle-opt" data-theme="auto" onclick="setThemePreference('auto')">تلقائي</div>
+          <div class="toggle-opt" data-theme="light" onclick="setThemePreference('light')">فاتح</div>
+          <div class="toggle-opt" data-theme="dark" onclick="setThemePreference('dark')">غامق</div>
+        </div>
       </div>
       <div class="settings-row" onclick="go('my-listings')"><i data-lucide="list" class="icon"></i><span>إعلاناتي</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="openDealConfirmStandalone()"><i data-lucide="handshake" class="icon"></i><span>تأكيد صفقة وتسديد عمولة</span><i data-lucide="chevron-left" class="icon chev"></i></div>
