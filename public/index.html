@@ -139,12 +139,13 @@
     <div class="card">
       <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:14px;">الشروط والأحكام</h3>
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:14px; max-height:130px; overflow-y:auto; margin-bottom:16px;">
-        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
-        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة (تُفعَّل شاشة تسديد العمولة في مرحلة لاحقة من التطبيق).</p>
+        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75; margin-bottom:10px;">سوق السكراب وسيط إعلاني فقط لعرض قطع الغيار والمركبات والتواصل بين البائعين والمشترين، وليست طرفاً في أي عملية بيع أو دفع. المسؤولية الكاملة عن دقة الإعلان وملكية القطعة/المركبة وإتمام الصفقة تقع على الطرفين.</p>
+        <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.75;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع حصته الخاصة من العمولة (2.5% من قيمة الصفقة لكل طرف على حدة)، ويؤكد كل طرف ويسدد حصته بشكل منفصل.</p>
       </div>
+      <p class="link" style="font-size:var(--fs-sm); margin:-6px 0 14px;" onclick="go('terms-view')">قراءة الشروط والأحكام كاملة</p>
       <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:18px;">
         <input type="checkbox" id="terms-check" style="width:auto; accent-color:var(--blue);" onchange="document.getElementById('terms-submit').disabled=!this.checked">
-        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">قرأت وأوافق على <span class="link" onclick="event.stopPropagation(); go('privacy')">سياسة الخصوصية</span> والشروط والأحكام</span>
+        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">قرأت وأوافق على <span class="link" onclick="event.stopPropagation(); go('terms-view')">الشروط والأحكام</span> و<span class="link" onclick="event.stopPropagation(); go('privacy')">سياسة الخصوصية</span></span>
       </div>
       <button class="btn-primary" id="terms-submit" disabled onclick="finishSignup()">متابعة إلى التطبيق</button>
     </div>
@@ -152,10 +153,71 @@
 
   <!-- ================= TERMS (READ-ONLY VIEW) ================= -->
   <div class="screen" id="screen-terms-view">
-    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الشروط والأحكام</h2></div>
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>الشروط والأحكام</h2></div>
+
     <div class="card">
-      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
-      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة.</p>
+      <p class="muted" style="font-size:var(--fs-xs); margin-bottom:10px;">آخر تحديث: <span id="terms-updated-date"></span></p>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">هذه الشروط والأحكام تنظّم استخدامك لمنصة "سوق السكراب". باستخدامك للمنصة أو إنشائك حساباً عليها، فأنت توافق على الالتزام بها كاملة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">١. طبيعة المنصة</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">"سوق السكراب" وسيط إعلاني إلكتروني فقط، يتيح للبائعين عرض قطع الغيار والمركبات التالفة، وللمشترين تصفّحها والتواصل مع البائعين. المنصة <b style="color:var(--text);">ليست طرفاً</b> في أي عملية بيع أو شراء، ولا في أي عملية دفع بين البائع والمشتري، ولا تملك أو تفحص أو تضمن أياً من القطع أو المركبات المعروضة عليها.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٢. العمولة</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">عند إتمام أي صفقة بيع أو شراء عن طريق المنصة، يلتزم <b style="color:var(--text);">كل من البائع والمشتري</b> بدفع عمولة قدرها 2.5% من قيمة الصفقة، كلٌّ من حصته الخاصة به (أي ما مجموعه 5% موزّعة بالتساوي بين الطرفين، وليست 2.5% مشتركة). يؤكد كل طرف إتمام الصفقة ويسدد حصته من العمولة بشكل مستقل عن الطرف الآخر، كلٌّ من داخل حسابه الخاص.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٣. مسؤولية المستخدم عن إعلاناته</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">يتحمّل البائع كامل المسؤولية عن صحة ودقة كل ما ينشره في إعلانه (الوصف، السعر، الصور، حالة القطعة/المركبة)، وعن كونه <b style="color:var(--text);">المالك النظامي</b> للقطعة أو المركبة المعروضة أو مفوَّضاً ببيعها. نشر إعلان لشيء لا يملكه المستخدم أو لا يحق له بيعه يُعد مخالفة صريحة لهذه الشروط.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٤. محتوى ومواد يُمنع عرضها</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:8px;">يُمنع منعاً باتاً استخدام المنصة لعرض أو بيع:</p>
+      <ul style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.95; margin:0; padding-right:18px;">
+        <li>أي قطعة أو مركبة مسروقة أو ذات مصدر غير معلوم أو غير نظامي.</li>
+        <li>قطع غيار مقلّدة أو مزوّرة يُوهَم المشتري بأنها أصلية.</li>
+        <li>أي سلعة أو خدمة تخالف الأنظمة والقوانين المعمول بها في المملكة العربية السعودية.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٥. عدم مسؤولية المنصة عن الصفقات</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">المنصة غير مسؤولة عن جودة القطع أو الحالة الفعلية للمركبات المعروضة، ولا عن مطابقة الإعلان للواقع، ولا عن أي خلاف ينشأ بين البائع والمشتري حول الصفقة (السعر، التسليم، جودة السلعة، أو أي أمر آخر). فحص السلعة والاتفاق على تفاصيل الصفقة مسؤولية الطرفين بالكامل قبل إتمامها.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٦. قواعد التعليقات والتقييمات</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:8px;">نظام التعليقات والتقييمات مخصص لمشاركة تجربة حقيقية مع البائع أو حول الإعلان. يُمنع:</p>
+      <ul style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.95; margin:0 0 8px; padding-right:18px;">
+        <li>أي إساءة أو ألفاظ غير لائقة أو تنمّر تجاه أي مستخدم.</li>
+        <li>التقييمات الوهمية أو المضلِّلة (تقييم بائع أو إعلان دون تجربة شراء أو تواصل حقيقي).</li>
+      </ul>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">التقييمات التي تُترك على حساب بائع <b style="color:var(--text);">لا تُحذف</b>، ولا يمكن للبائع نفسه تعديلها أو إزالتها — وهذا بالتصميم، لحماية مصداقية نظام التقييم. يمكن الإبلاغ عن تعليق مخالف لمراجعته من قبل إدارة المنصة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٧. الإبلاغ عن الاحتيال وإيقاف الحسابات المخالفة</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">يمكن لأي مستخدم الإبلاغ عن إعلان أو حساب أو تعليق يشتبه في كونه احتيالياً أو مخالفاً لهذه الشروط، من خلال زر "الإبلاغ" المتاح في كل مكان مناسب بالتطبيق. تحتفظ المنصة بالحق الكامل في مراجعة أي بلاغ، وإيقاف أو حذف أي حساب أو إعلان يثبت مخالفته لهذه الشروط، دون الحاجة لإشعار مسبق في حالات الاحتيال أو المخالفات الجسيمة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٨. الأنظمة المعمول بها</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">يخضع استخدام هذه المنصة وهذه الشروط لأنظمة المملكة العربية السعودية، وهي المرجع الوحيد عند أي نزاع أو خلاف ينشأ عن استخدام المنصة أو تفسير هذه الشروط.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٩. تعديل الشروط</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">يجوز للمنصة تعديل هذه الشروط من وقت لآخر. سيظهر تاريخ آخر تحديث أعلى هذه الصفحة دائماً، وفي حال وجود تغيير جوهري سنُعلم المستخدمين داخل التطبيق قبل سريانه. استمرارك في استخدام المنصة بعد التعديل يُعد موافقة على الشروط المحدَّثة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">١٠. سياسة الخصوصية</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">تعامل المنصة مع بياناتك الشخصية موضَّح بالتفصيل في <span class="link" onclick="go('privacy')">سياسة الخصوصية</span>، وهي جزء مكمّل لهذه الشروط.</p>
     </div>
   </div>
 
@@ -568,6 +630,10 @@
   <div class="screen" id="screen-deal-confirm">
     <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>تأكيد الصفقة وتسديد العمولة</h2></div>
     <div class="card">
+      <div class="info-box" style="margin-bottom:16px;">
+        <i data-lucide="info" class="icon icon-accent icon-top-align"></i>
+        <p style="font-size:var(--fs-sm); line-height:1.75; color:var(--text);" id="dc-role-note">هذه حصتك من العمولة (2.5%) عن هذه الصفقة فقط. الطرف الآخر يؤكد ويسدد حصته (2.5%) بشكل منفصل من حسابه.</p>
+      </div>
       <label>عملة الصفقة</label>
       <select id="dc-currency" onchange="recalcCommission()"></select>
       <label>مبلغ الصفقة</label>
@@ -575,8 +641,8 @@
 
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px;">
         <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">مبلغ الصفقة</span><span style="font-weight:600;" id="dc-amount-display">—</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">نسبة العمولة</span><span style="font-weight:600;" id="dc-rate-display">2.5%</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:var(--fs-base); border-top:1px solid var(--border); padding-top:8px;"><span style="font-weight:700;">العمولة المستحقة</span><span style="font-weight:700; color:var(--blue);" id="dc-commission-display">—</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">نسبة حصتك من العمولة</span><span style="font-weight:600;" id="dc-rate-display">2.5%</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-base); border-top:1px solid var(--border); padding-top:8px;"><span style="font-weight:700;">حصتك من العمولة</span><span style="font-weight:700; color:var(--blue);" id="dc-commission-display">—</span></div>
       </div>
 
       <p style="font-size:var(--fs-xs); font-weight:600; color:var(--text-secondary); margin-bottom:8px;">حوّل مبلغ العمولة إلى الحساب البنكي التالي</p>

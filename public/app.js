@@ -112,6 +112,7 @@ function go(id) {
   if (id === 'vehicle-browse') renderVehicleBrowse();
   if (id === 'messages') renderMessagesList();
   if (id === 'privacy') renderPrivacyPolicy();
+  if (id === 'terms-view') renderTermsView();
   window.scrollTo(0, 0);
 }
 function goBack() {
@@ -420,6 +421,13 @@ function logout() {
 const PRIVACY_POLICY_LAST_UPDATED = new Date();
 function renderPrivacyPolicy() {
   document.getElementById('privacy-updated-date').textContent = PRIVACY_POLICY_LAST_UPDATED.toLocaleDateString('ar');
+}
+
+// Terms & conditions "آخر تحديث" date — same reasoning as the privacy
+// policy's date above.
+const TERMS_LAST_UPDATED = new Date();
+function renderTermsView() {
+  document.getElementById('terms-updated-date').textContent = TERMS_LAST_UPDATED.toLocaleDateString('ar');
 }
 
 // Self-service account deletion (right to erasure) — irreversible, so it
@@ -899,7 +907,7 @@ async function openDetail(id) {
         <span class="muted">${seller.reviews_count} تقييم</span>
       </div>
 
-      ${!isOwnListing ? `<button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد العمولة</button>` : ''}
+      <button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد حصتك من العمولة</button>
     `;
     refreshIcons();
     renderComments();
@@ -1047,12 +1055,13 @@ let dealContext = null;
 function openDealConfirm() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
   if (!currentListingDetail || !currentSellerDetail) return;
-  dealContext = { listingId: currentListingDetail.id, currency: currentListingDetail.currency };
+  const isOwnListing = currentUser.id === currentSellerDetail.id;
+  dealContext = { listingId: currentListingDetail.id, currency: currentListingDetail.currency, role: isOwnListing ? 'seller' : 'buyer' };
   prepareDealConfirmScreen(dealContext.currency);
 }
 function openDealConfirmStandalone() {
   if (!currentUser) { toast('سجّل الدخول أولاً'); return go('login'); }
-  dealContext = { listingId: null, currency: (countryInfo(browsingCountry) && countryInfo(browsingCountry).currency) || 'SAR' };
+  dealContext = { listingId: null, currency: (countryInfo(browsingCountry) && countryInfo(browsingCountry).currency) || 'SAR', role: null };
   prepareDealConfirmScreen(dealContext.currency);
 }
 function prepareDealConfirmScreen(defaultCurrency) {
@@ -1063,6 +1072,15 @@ function prepareDealConfirmScreen(defaultCurrency) {
   document.getElementById('dc-rate-display').textContent = ((meta.commission_rate || 0.025) * 100).toFixed(1) + '%';
   document.getElementById('dc-bank-name').textContent = (meta.bank_account && meta.bank_account.bank_name) || '—';
   document.getElementById('dc-bank-iban').textContent = (meta.bank_account && meta.bank_account.iban) || '—';
+  const ratePct = ((meta.commission_rate || 0.025) * 100).toFixed(1) + '%';
+  const roleNote = document.getElementById('dc-role-note');
+  if (dealContext.role === 'seller') {
+    roleNote.textContent = `بصفتك البائع في هذا الإعلان، هذه حصتك من العمولة (${ratePct}) فقط. المشتري يؤكد ويسدد حصته (${ratePct}) بشكل منفصل من حسابه.`;
+  } else if (dealContext.role === 'buyer') {
+    roleNote.textContent = `بصفتك المشتري في هذا الإعلان، هذه حصتك من العمولة (${ratePct}) فقط. البائع يؤكد ويسدد حصته (${ratePct}) بشكل منفصل من حسابه.`;
+  } else {
+    roleNote.textContent = `هذه حصتك من العمولة (${ratePct}) عن هذه الصفقة فقط. الطرف الآخر يؤكد ويسدد حصته (${ratePct}) بشكل منفصل من حسابه.`;
+  }
   hideError('dc-error');
   recalcCommission();
   go('deal-confirm');
