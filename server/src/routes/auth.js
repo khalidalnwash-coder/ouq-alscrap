@@ -6,6 +6,7 @@ const { generateOtp, otpExpiry, sendOtpMock } = require('../utils/otp');
 const { serializeUser } = require('../utils/serialize');
 const { COUNTRIES, COUNTRY_PHONE_CODE } = require('../utils/constants');
 const { asyncHandler } = require('../utils/asyncHandler');
+const { deleteImage, deleteVideo } = require('../utils/storage');
 
 const router = express.Router();
 
@@ -278,6 +279,47 @@ router.get(
     const user = await findByUserId(req.userId);
     if (!user) return res.status(404).json({ error: 'مستخدم غير موجود' });
     res.json({ user: serializeUser(user) });
+  })
+);
+
+// DELETE /api/auth/me — self-service account deletion (right to erasure).
+// Requires the current password as re-authentication before an irreversible
+// action, same spirit as the listing-delete confirm() but for something far
+// more consequential. Every image/video across all of the user's listings is
+// removed from storage first (same cleanup DELETE /api/listings/:id and the
+// archival hard-delete sweep already do), then the user row itself — which
+// cascades to listings/listing_media, reports, transactions, conversations/
+// messages, listing_comments and reviews per the existing FK definitions,
+// so nothing is left behind.
+router.delete(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { password } = req.body || {};
+    const user = await findByUserId(req.userId);
+    if (!user) return res.status(404).json({ error: 'مستخدم غير موجود' });
+    if (!password) return res.status(400).json({ error: 'أدخل كلمة المرور لتأكيد حذف الحساب' });
+
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+
+    const listingsRes = await pool.query('SELECT id FROM listings WHERE seller_id = $1', [req.userId]);
+    if (listingsRes.rows.length) {
+      const mediaRes = await pool.query(
+        'SELECT type, original_url, thumbnail_url, storage_key FROM listing_media WHERE listing_id = ANY($1)',
+        [listingsRes.rows.map((l) => l.id)]
+      );
+      for (const m of mediaRes.rows) {
+        if (m.type === 'video') {
+          deleteVideo({ originalUrl: m.original_url, storageKey: m.storage_key });
+        } else {
+          deleteImage({ originalUrl: m.original_url, thumbnailUrl: m.thumbnail_url, storageKey: m.storage_key });
+        }
+      }
+    }
+
+    await pool.query('DELETE FROM users WHERE id = $1', [req.userId]);
+    res.json({ ok: true });
   })
 );
 

@@ -111,6 +111,7 @@ function go(id) {
   if (id === 'vehicle-makes') renderVehicleMakes();
   if (id === 'vehicle-browse') renderVehicleBrowse();
   if (id === 'messages') renderMessagesList();
+  if (id === 'privacy') renderPrivacyPolicy();
   window.scrollTo(0, 0);
 }
 function goBack() {
@@ -411,6 +412,35 @@ function logout() {
   currentUser = null;
   toast('تم تسجيل الخروج');
   go('landing');
+}
+
+// Privacy policy "آخر تحديث" date — today's date as a readable stand-in
+// until this page gets real versioning; see the placeholder notes inside
+// #screen-privacy itself for the other fields that still need filling in.
+const PRIVACY_POLICY_LAST_UPDATED = new Date();
+function renderPrivacyPolicy() {
+  document.getElementById('privacy-updated-date').textContent = PRIVACY_POLICY_LAST_UPDATED.toLocaleDateString('ar');
+}
+
+// Self-service account deletion (right to erasure) — irreversible, so it
+// goes through two confirmations: a plain-language warning, then the
+// current password as re-authentication (same reasoning a bank-grade
+// destructive action would use), before the server deletes anything.
+async function deleteAccount() {
+  if (!confirm('هل أنت متأكد أنك تريد حذف حسابك نهائياً؟ سيُحذف حسابك وكل إعلاناتك وصورك ومقاطع الفيديو الخاصة بك بشكل نهائي، ولا يمكن التراجع عن هذا الإجراء.')) {
+    return;
+  }
+  const password = prompt('لتأكيد الحذف، أدخل كلمة المرور الحالية:');
+  if (!password) return;
+  try {
+    await api('/auth/me', { method: 'DELETE', body: { password } });
+    setToken(null);
+    currentUser = null;
+    toast('تم حذف حسابك نهائياً');
+    go('landing');
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 // ---------- forgot password ----------
