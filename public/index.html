@@ -144,7 +144,7 @@
       </div>
       <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:18px;">
         <input type="checkbox" id="terms-check" style="width:auto; accent-color:var(--blue);" onchange="document.getElementById('terms-submit').disabled=!this.checked">
-        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">قرأت ووافقت على الشروط والأحكام وسياسة الخصوصية</span>
+        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">قرأت وأوافق على <span class="link" onclick="event.stopPropagation(); go('privacy')">سياسة الخصوصية</span> والشروط والأحكام</span>
       </div>
       <button class="btn-primary" id="terms-submit" disabled onclick="finishSignup()">متابعة إلى التطبيق</button>
     </div>
@@ -156,6 +156,96 @@
     <div class="card">
       <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8; margin-bottom:10px;">سوق السكراب منصة لعرض قطع الغيار والتواصل بين البائعين والمشترين فقط. المنصة ليست طرفاً في أي عملية دفع، والمسؤولية الكاملة عن دقة الإعلان وإتمام الصفقة تقع على الطرفين.</p>
       <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.8;">بإتمام صفقة عن طريق المنصة، يلتزم كل من البائع والمشتري بدفع عمولة قدرها 2.5% من قيمة الصفقة.</p>
+    </div>
+  </div>
+
+  <!-- ================= PRIVACY POLICY ================= -->
+  <!-- مبنية على الدليل الاسترشادي لهيئة البيانات والذكاء الاصطناعي (سدايا) لنظام
+       حماية البيانات الشخصية السعودي (PDPL). الأماكن المحاطة بـ [ ] بلون التحذير
+       بيانات رسمية غير متوفرة بعد (بريد رسمي، اسم الجهة النظامي...) ويجب تعبئتها
+       فعلياً قبل أي إطلاق حقيقي — راجع قسم "نقاط مفتوحة" في README. -->
+  <div class="screen" id="screen-privacy">
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2>سياسة الخصوصية</h2></div>
+
+    <div class="card">
+      <p class="muted" style="font-size:var(--fs-xs); margin-bottom:10px;">آخر تحديث: <span id="privacy-updated-date"></span></p>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">تحترم منصة "سوق السكراب" خصوصيتك، وتلتزم بحماية بياناتك الشخصية وفق نظام حماية البيانات الشخصية الصادر في المملكة العربية السعودية ولوائحه التنفيذية، وبما يتوافق مع الدليل الاسترشادي الصادر عن الهيئة السعودية للبيانات والذكاء الاصطناعي (سدايا). توضح هذه السياسة ما هي البيانات التي نجمعها عنك، ولماذا نجمعها، وأين تُحفظ، وما حقوقك تجاهها.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">١. البيانات التي نجمعها</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:8px;">عند استخدامك للمنصة، قد نجمع البيانات التالية:</p>
+      <ul style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.95; margin:0; padding-right:18px;">
+        <li>بيانات الحساب: الاسم الكامل، البريد الإلكتروني، رقم الجوال، الدولة، نوع الحساب (فرد/تاجر)، وكلمة المرور (محفوظة بصيغة مشفّرة ولا يطّلع عليها أحد).</li>
+        <li>محتوى الإعلانات: عنوان ووصف وسعر كل إعلان تنشره، وما يرفقه من صور وفيديو.</li>
+        <li>الرسائل: محتوى المحادثات التي ترسلها وتستقبلها عبر نظام المراسلة داخل التطبيق مع بائعين/مشترين آخرين.</li>
+        <li>التعليقات والتقييمات: أي تعليق تكتبه على إعلان، وأي تقييم (نجوم + تعليق اختياري) تتركه لبائع آخر.</li>
+        <li>سجل تأكيد الصفقات: قيمة الصفقة والعمولة المرتبطة بها وتاريخ تأكيدك لتسديدها (المنصة لا تعالج أي مبلغ فعلياً ولا تطّلع على بيانات بنكية خاصة بك).</li>
+        <li>بيانات تقنية محدودة: مثل وقت إنشاء الحساب وآخر نشاط، لأغراض تشغيل المنصة وحمايتها من الاستخدام غير المصرح به.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٢. الغرض من جمع البيانات واستخدامها</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">نستخدم بياناتك فقط لتشغيل خدمات المنصة: إنشاء حسابك والتحقق منه، نشر إعلاناتك وعرضها للمستخدمين الآخرين، تمكين التواصل بين البائع والمشتري، تمكين نظام التقييمات والتعليقات، احتساب عمولة المنصة ومتابعة تأكيد تسديدها، والتواصل معك بخصوص حسابك أو الدعم الفني. لا تُستخدم بياناتك لأي غرض آخر غير معلن هنا، ولا تُباع لأي طرف ثالث.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٣. مكان حفظ البيانات ونقلها</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:8px;">تُحفظ بيانات حسابك وإعلاناتك ورسائلك وتقييماتك في قاعدة بيانات مستضافة لدى مزوّد الاستضافة Render، والذي يقع مركز بياناته في الولايات المتحدة الأمريكية. أما الصور ومقاطع الفيديو التي ترفقها بإعلاناتك فتُحفظ لدى مزوّد تخزين الوسائط Cloudinary.</p>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">هذا يعني أن بياناتك قد تُنقل وتُعالج خارج المملكة العربية السعودية. نحرص على التعامل مع مزوّدين يطبّقون معايير حماية بيانات معترف بها دولياً، ونعمل على مواءمة ترتيبات نقل البيانات مع متطلبات نظام حماية البيانات الشخصية السعودي الخاصة بالنقل خارج المملكة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٤. مشاركة البيانات مع أطراف أخرى</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">لا نشارك بياناتك الشخصية مع أي طرف ثالث لأغراض تسويقية. تُعرض بيانات محدودة فقط للمستخدمين الآخرين كجزء طبيعي من عمل المنصة — مثل اسمك وتقييمك على بروفايلك العام، ورقم جوالك في صفحة الإعلان إذا اخترت إظهاره (ويمكنك إخفاؤه من "حسابي" في أي وقت). لا نشارك بياناتك مع جهات خارجية إلا في الحالات التالية: مزوّدو الاستضافة والتخزين المذكورين أعلاه (لتشغيل الخدمة فقط)، أو إذا طلبت جهة نظامية مختصة ذلك وفق الأنظمة المعمول بها في المملكة.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٥. مدة الاحتفاظ بالبيانات</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">يبقى حسابك وبياناته محفوظة طالما حسابك نشط. الإعلان الذي لا يُحدَّث لفترة طويلة يُؤرشف تلقائياً ثم يُحذف نهائياً هو وصوره وفيديوه بعد مدة محددة (راجع "الشروط والأحكام")، وإذا طلبت حذف حسابك، تُحذف كل بياناتك وإعلاناتك وصورك نهائياً خلال دقائق من تأكيد الطلب (راجع قسم "حقوقك" أدناه).</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٦. حقوقك تجاه بياناتك</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:8px;">وفق نظام حماية البيانات الشخصية، لك الحق في:</p>
+      <ul style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.95; margin:0 0 8px; padding-right:18px;">
+        <li><b style="color:var(--text);">الوصول إلى بياناتك:</b> يمكنك مراجعة بيانات حسابك مباشرة من "حسابي"، أو طلب نسخة كاملة منها عبر التواصل معنا.</li>
+        <li><b style="color:var(--text);">تصحيح بياناتك:</b> يمكنك تعديل بيانات حسابك من "حسابي" ← "تعديل بيانات الحساب"، أو تعديل أي إعلان تملكه في أي وقت.</li>
+        <li><b style="color:var(--text);">حذف بياناتك:</b> يمكنك حذف حسابك نهائياً بنفسك من "حسابي" ← "حذف حسابي"، ويشمل ذلك حذف كل إعلاناتك وصورك ومقاطع الفيديو الخاصة بك. هذا الإجراء نهائي ولا يمكن التراجع عنه.</li>
+        <li><b style="color:var(--text);">سحب الموافقة:</b> يمكنك في أي وقت التوقف عن استخدام المنصة وحذف حسابك، وهو ما يسحب موافقتك على معالجة بياناتك بالكامل.</li>
+        <li><b style="color:var(--text);">تقديم شكوى:</b> إذا رأيت أننا لم نتعامل مع بياناتك بما يتوافق مع النظام، يحق لك تقديم شكوى إلى الهيئة السعودية للبيانات والذكاء الاصطناعي (سدايا).</li>
+      </ul>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">لأي طلب يتعلق ببياناتك لا تغطيه خيارات التطبيق مباشرة (مثل طلب نسخة كاملة من بياناتك)، تواصل معنا عبر بيانات التواصل أدناه، وسنرد خلال مدة معقولة لا تتجاوز ما ينص عليه النظام.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٧. أمان البيانات</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">نتخذ إجراءات تقنية وتنظيمية معقولة لحماية بياناتك، منها: تشفير كلمة المرور بصيغة لا يمكن استرجاعها، تشفير الاتصال بين جهازك وخوادمنا (HTTPS)، وتقييد الوصول إلى قاعدة البيانات على فريق التشغيل فقط. مع ذلك، لا يمكن لأي نظام ضمان حماية مطلقة بنسبة 100%، ونعمل باستمرار على تحسين إجراءات الحماية لدينا.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٨. خصوصية الأطفال</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">هذه المنصة مخصصة للبالغين القادرين على إبرام تعاقدات بيع وشراء بشكل نظامي، وليست موجهة للأطفال. لا نجمع عن قصد بيانات أي شخص دون السن النظامية، وإذا تبيّن لنا أن حساباً أُنشئ من قبل قاصر فسنقوم بحذفه.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">٩. التحديثات على هذه السياسة</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">قد نحدّث هذه السياسة من وقت لآخر لمواكبة أي تغيير في خدماتنا أو في الأنظمة المعمول بها. سيظهر تاريخ آخر تحديث أعلى هذه الصفحة دائماً، وفي حال وجود تغيير جوهري سنُعلمك داخل التطبيق قبل سريانه.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-md); font-weight:700; margin-bottom:10px;">١٠. التواصل معنا</h3>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:10px;">لأي استفسار أو طلب يخص بياناتك الشخصية أو هذه السياسة، تواصل معنا عبر:</p>
+      <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
+        <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
+        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني المختص بحماية البيانات</p><p style="font-weight:700; font-size:var(--fs-base); color:var(--warning);">[يُستكمل لاحقاً: البريد الرسمي لمسؤول حماية البيانات]</p></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
+        <i data-lucide="headphones" class="icon icon-lg icon-muted"></i>
+        <div><p class="muted" style="font-size:var(--fs-xs);">الدعم الفني العام</p><p style="font-weight:700; font-size:var(--fs-base);">support@souqscrap.com</p></div>
+      </div>
+      <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">الجهة المشغّلة للمنصة: <span style="color:var(--warning); font-weight:700;">[يُستكمل لاحقاً: الاسم النظامي الكامل للجهة/السجل التجاري]</span></p>
     </div>
   </div>
 
@@ -529,8 +619,10 @@
       <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('support')"><i data-lucide="headphones" class="icon"></i><span>الدعم الفني</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('terms-view')"><i data-lucide="file-text" class="icon"></i><span>الشروط والأحكام</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('privacy')"><i data-lucide="shield-check" class="icon"></i><span>سياسة الخصوصية</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" id="admin-row" style="display:none;" onclick="go('admin')"><i data-lucide="settings" class="icon"></i><span>لوحة التحكم (مسؤول)</span><i data-lucide="chevron-left" class="icon chev"></i></div>
-      <div class="settings-row" style="border:none; color:var(--danger);" onclick="logout()"><i data-lucide="log-out" class="icon" style="color:var(--danger);"></i><span style="color:var(--danger);">تسجيل الخروج</span></div>
+      <div class="settings-row" onclick="logout()"><i data-lucide="log-out" class="icon"></i><span>تسجيل الخروج</span></div>
+      <div class="settings-row" style="border:none; color:var(--danger);" onclick="deleteAccount()"><i data-lucide="user-x" class="icon" style="color:var(--danger);"></i><span style="color:var(--danger);">حذف حسابي</span></div>
     </div>
   </div>
 
