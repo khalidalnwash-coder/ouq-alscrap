@@ -31,7 +31,7 @@ router.get(
     const reviewsRes = await pool.query(
       `SELECT rv.id, rv.rating, rv.comment, rv.created_at, u.full_name AS reviewer_name
        FROM reviews rv JOIN users u ON u.id = rv.reviewer_id
-       WHERE rv.seller_id = $1 ORDER BY rv.created_at DESC LIMIT 200`,
+       WHERE rv.seller_id = $1 AND rv.hidden = false ORDER BY rv.created_at DESC LIMIT 200`,
       [seller.id]
     );
 
@@ -118,7 +118,7 @@ router.post(
         [sellerId, req.userId, ratingNum, (comment || '').trim() || null]
       );
       const agg = await client.query(
-        `SELECT AVG(rating)::numeric(2,1) AS avg, COUNT(*)::int AS cnt FROM reviews WHERE seller_id = $1`,
+        `SELECT COALESCE(AVG(rating), 0)::numeric(2,1) AS avg, COUNT(*)::int AS cnt FROM reviews WHERE seller_id = $1 AND hidden = false`,
         [sellerId]
       );
       await client.query('UPDATE users SET rating_avg = $1, reviews_count = $2 WHERE id = $3', [

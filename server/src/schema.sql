@@ -242,3 +242,33 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reviews_count INTEGER NOT NULL DEFAUL
 ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_target_type_check;
 ALTER TABLE reports ADD CONSTRAINT reports_target_type_check
   CHECK (target_type IN ('listing','account','comment'));
+
+-- Admin dashboard (owner-only; see ADMIN_EMAIL in server/src/utils/admin.js).
+
+-- Distinct from commission_status: commission_status is the PAYER's own
+-- self-attestation ("I transferred it"), set the moment they confirm.
+-- admin_payment_status is the OWNER's manual verification against their own
+-- bank account — starts 'awaiting_review' on every new transaction and is
+-- only ever changed by the admin, never by the app itself.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS admin_payment_status TEXT NOT NULL DEFAULT 'awaiting_review'
+  CHECK (admin_payment_status IN ('awaiting_review','received','not_received'));
+
+-- Lets the admin hide a fake/abusive review without deleting it outright
+-- (keeps the record, just excludes it from the public list and from the
+-- seller's rating_avg/reviews_count — see routes/users.js).
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false;
+
+-- Audit trail of every admin action (spec-adjacent addition, requested
+-- alongside the dashboard) — who, when, what. action is a short machine
+-- label (e.g. 'suspend_user'), details a human-readable Arabic sentence
+-- for display; no target_type/target_id columns since a free-text sentence
+-- already names the target and avoids a join just to render the log.
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  details TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_actions_created ON admin_actions (created_at DESC);
