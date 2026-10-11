@@ -4,11 +4,18 @@ const { pool } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { generateOtp, otpExpiry, sendOtpMock } = require('../utils/otp');
 const { serializeUser } = require('../utils/serialize');
-const { COUNTRIES, COUNTRY_PHONE_CODE } = require('../utils/constants');
+const { COUNTRIES, COUNTRY_PHONE_CODE, COUNTRY_CITIES } = require('../utils/constants');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { deleteImage, deleteVideo } = require('../utils/storage');
 
 const router = express.Router();
+
+// Every city across all six GCC countries, used to validate the "city"
+// field on /profile (which — unlike signup — doesn't receive a "country"
+// in its request body, since the edit-profile screen derives its city
+// list from the selected phone country code rather than the account's
+// fixed country; see public/app.js's onEpCodeChange).
+const ALL_CITIES = new Set(Object.values(COUNTRY_CITIES).flat());
 
 const PLEDGE_TEXT =
   'أتعهد بالله، واستحضاراً لقول الله تعالى "وَقُل اعمَلوا فَسَيَرَى اللَّهُ عَمَلَكُم"، أن أكون أميناً في سعيي وأدفع عمولة التطبيق (2.5%) عند إتمام أي صفقة عن طريق المنصة، وإن لم أفعل فأتصدق بمثل هذا المبلغ';
@@ -26,6 +33,7 @@ router.post(
       email,
       age,
       country,
+      city,
       password,
       pledge_accepted,
       otp_channel,
@@ -42,6 +50,11 @@ router.post(
     }
     if (!Object.values(COUNTRY_PHONE_CODE).includes(phone_country_code)) {
       return res.status(400).json({ error: 'مفتاح جوال غير صالح' });
+    }
+    // City is optional at signup, but if provided it must belong to the
+    // chosen country's own city list (never a free-text or cross-country value).
+    if (city && !COUNTRY_CITIES[country].includes(city)) {
+      return res.status(400).json({ error: 'اختر مدينة ضمن الدولة المحددة' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
@@ -64,9 +77,9 @@ router.post(
 
     const result = await pool.query(
       `INSERT INTO users
-        (full_name, account_type, phone_country_code, phone_number, email, password_hash, age, country,
+        (full_name, account_type, phone_country_code, phone_number, email, password_hash, age, country, city,
          pledge_accepted_at, otp_channel, otp_code, otp_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now(), $9,$10,$11)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10,$11,$12)
        RETURNING *`,
       [
         full_name,
@@ -77,6 +90,7 @@ router.post(
         passwordHash,
         age || null,
         country,
+        city || null,
         otp_channel,
         code,
         otpExpiry(),
@@ -220,7 +234,15 @@ router.patch(
       updates.push(`full_name = $${params.length}`);
     }
     if (city !== undefined) {
-      params.push(city ? city.trim() : null);
+      const trimmedCity = city ? city.trim() : '';
+      // Validated against the full GCC city set, not the account's fixed
+      // country: the edit-profile screen offers cities for whichever phone
+      // country code the user has selected there, which may differ from
+      // their account's registered country.
+      if (trimmedCity && !ALL_CITIES.has(trimmedCity)) {
+        return res.status(400).json({ error: 'مدينة غير صالحة' });
+      }
+      params.push(trimmedCity || null);
       updates.push(`city = $${params.length}`);
     }
     if (!updates.length) return res.status(400).json({ error: 'لا يوجد تعديل لحفظه' });

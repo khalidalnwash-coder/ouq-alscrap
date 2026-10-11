@@ -187,6 +187,9 @@ async function bootstrap() {
 function countryInfo(code) {
   return meta.countries.find((c) => c.code === code) || null;
 }
+function countryByPhoneCode(phoneCode) {
+  return meta.countries.find((c) => c.phone_code === phoneCode) || null;
+}
 function countryOptionsHtml(selectedCode) {
   return meta.countries
     .map((c) => `<option value="${c.code}" ${c.code === selectedCode ? 'selected' : ''}>${c.flag} ${escapeHtml(c.label)}</option>`)
@@ -212,6 +215,11 @@ function onBrowsingCountryChange(code) {
 function onSignupCountryChange() {
   const country = document.getElementById('su-country').value;
   document.getElementById('su-code').value = countryInfo(country).phone_code;
+  // Country changed, so any previously-picked city (belonging to the old
+  // country) is no longer valid — clear it along with repopulating the list.
+  const cities = meta.cities_by_country[country] || [];
+  document.getElementById('su-city').innerHTML =
+    '<option value="">— بدون تحديد —</option>' + cities.map((c) => `<option>${escapeHtml(c)}</option>`).join('');
 }
 function onCreateCountryChange() {
   const country = document.getElementById('cl-country').value;
@@ -256,6 +264,7 @@ function populateYearFilter(selectId, selectedValue) {
 function populateMetaSelects() {
   document.getElementById('su-country').innerHTML = countryOptionsHtml(browsingCountry);
   document.getElementById('su-code').innerHTML = phoneCodeOptionsHtml(countryInfo(browsingCountry)?.phone_code);
+  onSignupCountryChange();
   document.getElementById('cl-country').innerHTML = countryOptionsHtml(browsingCountry);
   document.getElementById('home-country').innerHTML = countryOptionsHtml(browsingCountry);
   document.getElementById('search-country').innerHTML = countryOptionsHtml(browsingCountry);
@@ -279,6 +288,7 @@ function submitSignup() {
   hideError('su-error');
   const full_name = document.getElementById('su-name').value.trim();
   const country = document.getElementById('su-country').value;
+  const city = document.getElementById('su-city').value;
   const phone_country_code = document.getElementById('su-code').value;
   const phone_number = document.getElementById('su-phone').value.trim();
   const email = document.getElementById('su-email').value.trim();
@@ -292,7 +302,7 @@ function submitSignup() {
   if (password.length < 8) {
     return showError('su-error', 'كلمة المرور يجب أن تكون 8 أحرف على الأقل');
   }
-  signupData = { full_name, account_type: accountType, country, phone_country_code, phone_number, email, age, password, pledge_accepted };
+  signupData = { full_name, account_type: accountType, country, city: city || undefined, phone_country_code, phone_number, email, age, password, pledge_accepted };
   go('otp-choice');
 }
 function selectOtpMethod(method) {
@@ -1890,14 +1900,26 @@ function renderEditProfile() {
   document.getElementById('ep-code').innerHTML = phoneCodeOptionsHtml(currentUser.phone_country_code);
   document.getElementById('ep-phone').value = currentUser.phone_number;
   document.getElementById('ep-email').value = currentUser.email;
-  const cities = meta.cities_by_country[currentUser.country] || [];
-  document.getElementById('ep-city').innerHTML =
-    '<option value="">— بدون تحديد —</option>' + cities.map((c) => `<option ${c === currentUser.city ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+  populateEpCities(currentUser.city || '');
   selectEpOtpChannel('whatsapp');
   hideError('ep-error1');
   hideError('ep-error2');
   document.getElementById('ep-step1').style.display = 'block';
   document.getElementById('ep-step2').style.display = 'none';
+}
+// City list here follows the selected phone country code (#ep-code) — the
+// only "which GCC country" control on this screen — not the account's
+// fixed country, which this screen never lets the user change.
+function populateEpCities(selectedCity) {
+  const country = countryByPhoneCode(document.getElementById('ep-code').value);
+  const cities = (country && meta.cities_by_country[country.code]) || [];
+  document.getElementById('ep-city').innerHTML =
+    '<option value="">— بدون تحديد —</option>' + cities.map((c) => `<option ${c === selectedCity ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+function onEpCodeChange() {
+  // Phone country code changed, so any previously-picked city (belonging
+  // to the old country) is no longer valid — clear it.
+  populateEpCities('');
 }
 function selectEpOtpChannel(channel) {
   epOtpChannel = channel;

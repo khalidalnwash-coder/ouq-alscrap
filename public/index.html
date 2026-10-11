@@ -45,6 +45,9 @@
       <label>الدولة</label>
       <select id="su-country" onchange="onSignupCountryChange()"></select>
 
+      <label>المدينة (اختياري)</label>
+      <select id="su-city"></select>
+
       <label>رقم الجوال</label>
       <div class="row2">
         <div style="flex:0 0 118px;">
@@ -730,7 +733,7 @@
       <label>رقم الجوال</label>
       <div class="row2">
         <div style="flex:0 0 118px;">
-          <select id="ep-code"></select>
+          <select id="ep-code" onchange="onEpCodeChange()"></select>
         </div>
         <div><input id="ep-phone" placeholder="5XXXXXXXX"></div>
       </div>
