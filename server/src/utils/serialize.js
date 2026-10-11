@@ -1,3 +1,5 @@
+const { isAdminEmail } = require('./admin');
+
 function serializeUser(u) {
   if (!u) return null;
   return {
@@ -15,7 +17,7 @@ function serializeUser(u) {
     notifications_enabled: u.notifications_enabled,
     phone_visible: u.phone_visible,
     is_verified_trader: u.is_verified_trader,
-    is_admin: u.is_admin,
+    is_admin: isAdminEmail(u.email),
     rating_avg: Number(u.rating_avg),
     completed_deals_count: u.completed_deals_count,
     status: u.status,

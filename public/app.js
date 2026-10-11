@@ -107,6 +107,7 @@ function go(id) {
   if (id === 'create') prepareCreateScreen();
   if (id === 'profile') renderProfile();
   if (id === 'admin') renderAdmin();
+  if (id === 'admin-user') renderAdminUserDetail(adminUserId);
   if (id === 'my-listings') renderMyListings();
   if (id === 'vehicle-makes') renderVehicleMakes();
   if (id === 'vehicle-browse') renderVehicleBrowse();
@@ -948,6 +949,7 @@ function commentRow(c) {
     </div>
     <p style="font-size:var(--fs-sm); line-height:1.6; margin-bottom:4px;">${escapeHtml(c.body)}</p>
     ${currentUser ? `<span class="link" style="font-size:var(--fs-xs);" onclick="openReportComment('${c.id}')">إبلاغ</span>` : ''}
+    ${currentUser && currentUser.is_admin ? `<span class="link" style="font-size:var(--fs-xs); color:var(--danger); margin-right:10px;" onclick="adminDeleteComment('${c.id}')">حذف (مشرف)</span>` : ''}
   </div>`;
 }
 async function submitComment() {
@@ -1875,76 +1877,329 @@ async function togglePhoneVisibility() {
 }
 
 // ---------- admin ----------
-const REPORT_STATUS_LABELS = { pending: 'قيد المراجعة', reviewed: 'تمت المراجعة', resolved: 'تم الحل' };
 const REPORT_REASON_LABEL_MAP = {}; // filled lazily from meta.report_reasons on first admin render
 function reportReasonLabel(reason) {
   if (!Object.keys(REPORT_REASON_LABEL_MAP).length) {
-    [...(meta.report_reasons.listing || []), ...(meta.report_reasons.account || [])]
+    [...(meta.report_reasons.listing || []), ...(meta.report_reasons.account || []), ...(meta.report_reasons.comment || [])]
       .forEach((r) => { REPORT_REASON_LABEL_MAP[r.value] = r.label; });
   }
   return REPORT_REASON_LABEL_MAP[reason] || reason;
 }
-async function renderAdmin() {
+const PAYMENT_STATUS_LABELS = { awaiting_review: 'بانتظار التحقق', received: 'تم الاستلام', not_received: 'لم يصل' };
+const PAYMENT_STATUS_BADGE_CLASS = { awaiting_review: 'badge-warning', received: 'badge-success', not_received: 'badge-danger' };
+const ADMIN_ACTION_LABELS = {
+  suspend_user: 'إيقاف حساب', activate_user: 'تفعيل حساب', dismiss_report: 'تجاهل بلاغ',
+  delete_reported_content: 'حذف محتوى مبلّغ عنه', delete_listing: 'حذف إعلان', delete_comment: 'حذف تعليق',
+  hide_review: 'إخفاء تقييم', unhide_review: 'إظهار تقييم', update_payment_status: 'تحديث حالة دفعة',
+};
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString('ar', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+const _debounceTimers = {};
+function debounce(key, fn, delay = 300) {
+  clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(fn, delay);
+}
+
+let adminTab = 'overview';
+function switchAdminTab(tab) {
+  adminTab = tab;
+  ['overview', 'commissions', 'reports', 'users', 'log'].forEach((t) => {
+    document.getElementById('atab-btn-' + t).classList.toggle('active', t === tab);
+    document.getElementById('admin-tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'overview') renderAdminStats();
+  if (tab === 'commissions') renderAdminTransactions();
+  if (tab === 'reports') renderAdminReports();
+  if (tab === 'users') renderAdminUsers();
+  if (tab === 'log') renderAdminLog();
+}
+function renderAdmin() {
   if (!currentUser || !currentUser.is_admin) { toast('صلاحية مسؤول مطلوبة'); return go('profile'); }
-  const statsEl = document.getElementById('admin-stats');
-  const reportsEl = document.getElementById('admin-reports');
-  const usersEl = document.getElementById('admin-users');
-  statsEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
-  reportsEl.innerHTML = '';
-  usersEl.innerHTML = '';
+  switchAdminTab(adminTab);
+}
+
+function commissionTotalsHtml(rows) {
+  if (!rows.length) return '0';
+  return rows.map((r) => formatPrice(r.total, r.currency)).join('<br>');
+}
+async function renderAdminStats() {
+  const el = document.getElementById('admin-stats');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
   try {
     const stats = await api('/admin/stats');
-    statsEl.innerHTML = `
-      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إحصائيات سريعة</h3>
-      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">مستخدمون نشطون</span><span style="font-weight:600;">${stats.active_users_count}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:8px;"><span class="muted">إعلانات اليوم</span><span style="font-weight:600;">${stats.listings_posted_today}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm);"><span class="muted">إجمالي الإعلانات النشطة</span><span style="font-weight:600;">${stats.active_listings_count}</span></div>
+    el.innerHTML = `
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">أرقام سريعة</h3>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:10px;"><span class="muted">عدد المستخدمين</span><span style="font-weight:700;">${stats.users_count}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:10px;"><span class="muted">الإعلانات النشطة</span><span style="font-weight:700;">${stats.active_listings_count}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:10px; border-top:1px solid var(--border); padding-top:10px;"><span class="muted">الصفقات المؤكدة</span><span style="font-weight:700;">${stats.confirmed_deals_count}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:10px;"><span class="muted">مجموع العمولات المستحقة</span><span style="font-weight:700; color:var(--blue); text-align:left;">${commissionTotalsHtml(stats.commission_due)}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm);"><span class="muted">مجموع العمولات المستلمة</span><span style="font-weight:700; color:var(--success); text-align:left;">${commissionTotalsHtml(stats.commission_received)}</span></div>
     `;
-
-    const { reports } = await api('/admin/reports?status=pending');
-    reportsEl.innerHTML = '<h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">بلاغات قيد المراجعة</h3>' + (reports.length
-      ? reports.map((r) => `
-        <div class="settings-row" style="align-items:flex-start;">
-          <span class="badge ${r.target_type === 'listing' ? 'badge-warning' : 'badge-danger'}" style="margin-top:2px;">${r.target_type === 'listing' ? 'إعلان' : 'حساب'}</span>
-          <span>
-            <b>${escapeHtml(r.target_label || '—')}</b><br>
-            <span class="muted">${escapeHtml(reportReasonLabel(r.reason))}${r.details ? ' — ' + escapeHtml(r.details) : ''}</span><br>
-            <span class="muted" style="font-size:var(--fs-xs);">بلّغ عنه: ${escapeHtml(r.reporter_name)}</span>
-          </span>
-          <button class="btn-ghost" style="border:1px solid var(--border);" onclick="resolveReport('${r.id}')">حل البلاغ</button>
-        </div>
-      `).join('')
-      : '<p class="muted">لا توجد بلاغات قيد المراجعة</p>');
-
-    const { users } = await api('/admin/users');
-    usersEl.innerHTML = '<h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:12px;">إدارة الحسابات</h3>' + users.map((u) => `
-      <div class="settings-row">
-        <span class="status-dot ${u.status === 'active' ? 'status-dot-success' : 'status-dot-danger'}"></span>
-        <span>${escapeHtml(u.full_name)}<br><span class="muted">${escapeHtml(u.email)}</span></span>
-        <button class="btn-ghost" style="border:1px solid var(--border);" onclick="toggleUserStatus('${u.id}','${u.status}')">${u.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
-      </div>
-    `).join('');
   } catch (err) {
-    statsEl.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
   }
 }
-async function resolveReport(id) {
+
+// ---------- admin: commissions ----------
+async function renderAdminTransactions() {
+  const el = document.getElementById('admin-transactions');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  const status = document.getElementById('admin-tx-status').value;
+  const search = document.getElementById('admin-tx-search').value.trim();
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (search) params.set('search', search);
+  try {
+    const { transactions } = await api('/admin/transactions?' + params.toString());
+    el.innerHTML = transactions.length ? transactions.map((t) => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:8px;">
+          <div>
+            <p style="font-weight:700; font-size:var(--fs-sm);">${escapeHtml(t.user_name)} <span class="badge ${t.role === 'buyer' ? 'badge-warning' : 'badge-success'}">${t.role === 'buyer' ? 'مشترٍ' : 'بائع'}</span></p>
+            <p class="muted" style="font-size:var(--fs-xs);">${escapeHtml(t.user_email)}</p>
+          </div>
+          <span class="badge ${PAYMENT_STATUS_BADGE_CLASS[t.admin_payment_status]}">${PAYMENT_STATUS_LABELS[t.admin_payment_status]}</span>
+        </div>
+        ${t.listing_title ? `<p class="link" style="font-size:var(--fs-sm); margin-bottom:6px;" onclick="openDetail('${t.listing_id}')">${escapeHtml(t.listing_title)}</p>` : '<p class="muted" style="font-size:var(--fs-sm); margin-bottom:6px;">بدون إعلان مرتبط</p>'}
+        <div style="display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:10px;">
+          <span class="muted">${formatDateTime(t.created_at)}</span>
+          <span>قيمة الصفقة: <b>${formatPrice(t.deal_amount, t.currency)}</b> — حصته: <b style="color:var(--blue);">${formatPrice(t.commission_amount, t.currency)}</b></span>
+        </div>
+        <select onchange="setTransactionPaymentStatus('${t.id}', this.value)" style="margin-bottom:0;">
+          <option value="awaiting_review" ${t.admin_payment_status === 'awaiting_review' ? 'selected' : ''}>بانتظار التحقق</option>
+          <option value="received" ${t.admin_payment_status === 'received' ? 'selected' : ''}>تم الاستلام</option>
+          <option value="not_received" ${t.admin_payment_status === 'not_received' ? 'selected' : ''}>لم يصل</option>
+        </select>
+      </div>
+    `).join('') : '<p class="muted center">لا توجد دفعات مطابقة</p>';
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+async function setTransactionPaymentStatus(id, status) {
+  try {
+    await api('/admin/transactions/' + id + '/payment-status', { method: 'PATCH', body: { status } });
+    toast('تم تحديث حالة الدفعة');
+    renderAdminTransactions();
+  } catch (err) {
+    toast(err.message);
+    renderAdminTransactions();
+  }
+}
+
+// ---------- admin: reports ----------
+async function renderAdminReports() {
+  const el = document.getElementById('admin-reports');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  const status = document.getElementById('admin-reports-status').value;
+  try {
+    const { reports } = await api('/admin/reports' + (status ? '?status=' + status : ''));
+    el.innerHTML = reports.length ? reports.map((r) => {
+      const targetTypeLabel = { listing: 'إعلان', account: 'حساب', comment: 'تعليق' }[r.target_type];
+      const contentGone = !r.target_label;
+      const viewAction = r.target_type === 'account'
+        ? (r.offender_user_id ? `onclick="openSeller('${r.offender_user_id}')"` : '')
+        : (r.related_listing_id ? `onclick="openDetail('${r.related_listing_id}')"` : '');
+      return `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:8px;">
+          <span class="badge ${r.target_type === 'listing' ? 'badge-warning' : r.target_type === 'account' ? 'badge-danger' : 'badge-success'}">${targetTypeLabel}</span>
+          <span class="muted" style="font-size:var(--fs-xs);">${formatDateTime(r.created_at)}</span>
+        </div>
+        ${contentGone
+          ? '<p class="muted" style="font-size:var(--fs-sm); margin-bottom:6px;">المحتوى المبلّغ عنه محذوف</p>'
+          : `<p ${viewAction ? 'class="link"' : ''} style="font-size:var(--fs-sm); font-weight:600; margin-bottom:6px;" ${viewAction}>${escapeHtml(r.target_label)}</p>`}
+        <p class="muted" style="font-size:var(--fs-sm); margin-bottom:4px;">${escapeHtml(reportReasonLabel(r.reason))}${r.details ? ' — ' + escapeHtml(r.details) : ''}</p>
+        <p class="muted" style="font-size:var(--fs-xs); margin-bottom:12px;">بلّغ عنه: ${escapeHtml(r.reporter_name)} · الحالة: ${r.status === 'pending' ? 'قيد المراجعة' : r.status === 'reviewed' ? 'تمت المراجعة' : 'تم الحل'}</p>
+        ${r.status === 'pending' ? `
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-outline card-action-btn" style="flex:1;" onclick="dismissReport('${r.id}')">تجاهل</button>
+          ${!contentGone && r.target_type !== 'account' ? `<button class="btn-outline card-action-btn" style="flex:1; color:var(--danger); border-color:var(--danger);" onclick="deleteReportedContent('${r.id}')">حذف المحتوى</button>` : ''}
+          ${r.offender_user_id ? `<button class="btn-outline card-action-btn" style="flex:1; color:var(--danger); border-color:var(--danger);" onclick="suspendReportOffender('${r.id}')">إيقاف الحساب</button>` : ''}
+        </div>` : ''}
+      </div>
+    `; }).join('') : '<p class="muted center">لا توجد بلاغات</p>';
+    refreshIcons();
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+async function dismissReport(id) {
   try {
     await api('/admin/reports/' + id + '/status', { method: 'PATCH', body: { status: 'resolved' } });
-    toast('تم تحديث حالة البلاغ');
-    renderAdmin();
+    toast('تم تجاهل البلاغ');
+    renderAdminReports();
   } catch (err) {
     toast(err.message);
   }
 }
-async function toggleUserStatus(id, currentStatus) {
+async function deleteReportedContent(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا المحتوى نهائياً؟')) return;
+  try {
+    await api('/admin/reports/' + id + '/delete-content', { method: 'POST' });
+    toast('تم حذف المحتوى');
+    renderAdminReports();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function suspendReportOffender(id) {
+  if (!confirm('هل أنت متأكد من إيقاف هذا الحساب؟')) return;
+  try {
+    await api('/admin/reports/' + id + '/suspend-offender', { method: 'POST' });
+    toast('تم إيقاف الحساب');
+    renderAdminReports();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// ---------- admin: users ----------
+let lastAdminUsersList = [];
+async function renderAdminUsers() {
+  const el = document.getElementById('admin-users');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  const search = document.getElementById('admin-users-search').value.trim();
+  try {
+    const { users } = await api('/admin/users' + (search ? '?search=' + encodeURIComponent(search) : ''));
+    lastAdminUsersList = users;
+    el.innerHTML = users.length ? users.map((u) => `
+      <div class="settings-row" onclick="openAdminUser('${u.id}')">
+        <span class="status-dot ${u.status === 'active' ? 'status-dot-success' : 'status-dot-danger'}"></span>
+        <span>${escapeHtml(u.full_name)}${u.is_admin ? ' <span class="badge badge-success">مشرف</span>' : ''}<br><span class="muted">${escapeHtml(u.email)}</span></span>
+        <i data-lucide="chevron-left" class="icon chev"></i>
+      </div>
+    `).join('') : '<p class="muted center">لا يوجد مستخدمون مطابقون</p>';
+    refreshIcons();
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+let adminUserId = null;
+function openAdminUser(id) {
+  adminUserId = id;
+  go('admin-user');
+}
+async function renderAdminUserDetail(id) {
+  const infoEl = document.getElementById('admin-user-info');
+  const listingsEl = document.getElementById('admin-user-listings');
+  const reviewsEl = document.getElementById('admin-user-reviews');
+  document.getElementById('admin-user-title').textContent = 'جارِ التحميل...';
+  infoEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+  listingsEl.innerHTML = '';
+  reviewsEl.innerHTML = '';
+  try {
+    const [{ listings }, { reviews }] = await Promise.all([
+      api('/admin/users/' + id + '/listings'),
+      api('/admin/users/' + id + '/reviews'),
+    ]);
+    // Display fields (name/email/status/is_admin) come from the already-
+    // fetched users list (renderAdminUsers) rather than a second lookup —
+    // /admin/users only supports name/email search, not lookup by id.
+    let full_name = '—', email = '', status = 'active', is_admin = false;
+    const matched = lastAdminUsersList.find((u) => u.id === id);
+    if (matched) ({ full_name, email, status, is_admin } = matched);
+
+    document.getElementById('admin-user-title').textContent = full_name;
+    infoEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div><p style="font-weight:700;">${escapeHtml(full_name)}${is_admin ? ' <span class="badge badge-success">مشرف</span>' : ''}</p><p class="muted" style="font-size:var(--fs-sm);">${escapeHtml(email)}</p></div>
+        <span class="status-dot ${status === 'active' ? 'status-dot-success' : 'status-dot-danger'}"></span>
+      </div>
+      <button class="btn-outline" ${is_admin ? 'disabled title="لا يمكن إيقاف حساب المشرف"' : ''} onclick="toggleAdminUserStatus('${id}','${status}')">${status === 'active' ? 'إيقاف الحساب' : 'تفعيل الحساب'}</button>
+    `;
+
+    listingsEl.innerHTML = listings.length ? listings.map((l) => `
+      <div class="listing-card">
+        <div class="listing-thumb" onclick="openDetail('${l.id}')">${l.thumbnail_url ? `<img src="${l.thumbnail_url}" onerror="handleImgError(this)">` : icon('package', 'icon-lg')}</div>
+        <div class="listing-info">
+          <div class="title" onclick="openDetail('${l.id}')">${escapeHtml(l.title)}</div>
+          <div class="price">${formatPrice(l.price, l.currency)}</div>
+          <span class="badge ${l.status === 'active' ? 'badge-success' : l.status === 'archived' ? 'badge-warning' : 'badge-danger'}" style="margin-top:4px;">${l.status === 'active' ? 'نشط' : l.status === 'archived' ? 'مؤرشف' : l.status === 'sold' ? 'مباع' : 'محذوف'}</span>
+          <button class="btn-ghost card-action-btn" style="color:var(--danger);" onclick="adminDeleteListing('${l.id}')">${icon('trash-2', 'icon-xs')} حذف</button>
+        </div>
+      </div>
+    `).join('') : '<p class="muted">لا توجد إعلانات</p>';
+
+    reviewsEl.innerHTML = reviews.length ? reviews.map((rv) => `
+      <div class="settings-row" style="align-items:flex-start;">
+        <span>
+          <span style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">${icon('star', 'icon-sm icon-star-filled')} <b>${rv.rating}</b> ${rv.hidden ? '<span class="badge badge-danger">مخفي</span>' : ''}</span>
+          <span style="font-size:var(--fs-sm);">${escapeHtml(rv.comment || '—')}</span><br>
+          <span class="muted" style="font-size:var(--fs-xs);">${escapeHtml(rv.reviewer_name)} · ${formatDateTime(rv.created_at)}</span>
+        </span>
+        <button class="btn-ghost" style="border:1px solid var(--border); flex-shrink:0;" onclick="toggleReviewHidden('${rv.id}', ${!rv.hidden}, '${id}')">${rv.hidden ? 'إظهار' : 'إخفاء'}</button>
+      </div>
+    `).join('') : '<p class="muted">لا توجد تقييمات</p>';
+    refreshIcons();
+  } catch (err) {
+    infoEl.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+async function toggleAdminUserStatus(id, currentStatus) {
   const status = currentStatus === 'active' ? 'suspended' : 'active';
   try {
     await api('/admin/users/' + id + '/status', { method: 'PATCH', body: { status } });
+    // Keep the cached users list (renderAdminUserDetail's only source for
+    // name/email/status/is_admin, see its own comment) in sync — otherwise
+    // the re-render below still shows the pre-toggle status/button label
+    // until the admin goes back and reopens this user from the list.
+    const cached = lastAdminUsersList.find((u) => u.id === id);
+    if (cached) cached.status = status;
     toast('تم التحديث');
-    renderAdmin();
+    renderAdminUserDetail(id);
   } catch (err) {
     toast(err.message);
+  }
+}
+async function adminDeleteListing(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا الإعلان نهائياً؟')) return;
+  try {
+    await api('/admin/listings/' + id, { method: 'DELETE' });
+    toast('تم حذف الإعلان');
+    renderAdminUserDetail(adminUserId);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function toggleReviewHidden(id, hidden, userId) {
+  try {
+    await api('/admin/reviews/' + id + '/hidden', { method: 'PATCH', body: { hidden } });
+    toast(hidden ? 'تم إخفاء التقييم' : 'تم إظهار التقييم');
+    renderAdminUserDetail(userId);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function adminDeleteComment(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا التعليق؟')) return;
+  try {
+    await api('/admin/comments/' + id, { method: 'DELETE' });
+    toast('تم حذف التعليق');
+    renderComments();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// ---------- admin: audit log ----------
+async function renderAdminLog() {
+  const el = document.getElementById('admin-log');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  try {
+    const { actions } = await api('/admin/actions');
+    el.innerHTML = actions.length ? actions.map((a) => `
+      <div class="settings-row" style="cursor:default;">
+        <span>
+          <b>${ADMIN_ACTION_LABELS[a.action] || a.action}</b><br>
+          <span class="muted" style="font-size:var(--fs-sm);">${escapeHtml(a.details)}</span><br>
+          <span class="muted" style="font-size:var(--fs-xs);">${escapeHtml(a.admin_name)} · ${formatDateTime(a.created_at)}</span>
+        </span>
+      </div>
+    `).join('') : '<p class="muted center">لا توجد إجراءات مسجّلة بعد</p>';
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
   }
 }
 

@@ -237,6 +237,11 @@ button:active{ transform:translateY(1px); }
 .settings-row .icon{ width:18px; height:18px; color:var(--text-secondary); flex-shrink:0; }
 .settings-row span{ flex:1; font-size:var(--fs-base); font-weight:500; }
 .settings-row .chev{ color:var(--text-muted); width:16px; height:16px; }
+/* .settings-row span{flex:1} outweighs .status-dot's own flex-shrink:0 by
+   specificity (class+element beats class alone), stretching the dot into
+   an oval when the two are combined (admin users list) — pre-existing,
+   just not triggered until this combination was used. */
+.settings-row .status-dot{ flex:none; }
 
 .toast{
   position:fixed; bottom:96px; left:50%; transform:translateX(-50%); background:var(--blue-dark); color:#fff;

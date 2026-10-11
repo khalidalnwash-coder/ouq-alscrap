@@ -741,9 +741,73 @@
   <!-- ================= ADMIN ================= -->
   <div class="screen" id="screen-admin">
     <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>لوحة التحكم</h2></div>
-    <div class="card" id="admin-stats"></div>
-    <div class="card" id="admin-reports"></div>
-    <div class="card" id="admin-users"></div>
+
+    <div class="tab-bar">
+      <div class="tab-btn active" id="atab-btn-overview" onclick="switchAdminTab('overview')">الرئيسية</div>
+      <div class="tab-btn" id="atab-btn-commissions" onclick="switchAdminTab('commissions')">العمولات</div>
+      <div class="tab-btn" id="atab-btn-reports" onclick="switchAdminTab('reports')">البلاغات</div>
+      <div class="tab-btn" id="atab-btn-users" onclick="switchAdminTab('users')">المستخدمين</div>
+      <div class="tab-btn" id="atab-btn-log" onclick="switchAdminTab('log')">السجل</div>
+    </div>
+
+    <div id="admin-tab-overview">
+      <div class="card" id="admin-stats"></div>
+    </div>
+
+    <div id="admin-tab-commissions" style="display:none;">
+      <div class="card">
+        <div class="row2">
+          <div>
+            <label>الحالة</label>
+            <select id="admin-tx-status" onchange="renderAdminTransactions()">
+              <option value="">كل الحالات</option>
+              <option value="awaiting_review">بانتظار التحقق</option>
+              <option value="received">تم الاستلام</option>
+              <option value="not_received">لم يصل</option>
+            </select>
+          </div>
+          <div>
+            <label>بحث بالاسم</label>
+            <input id="admin-tx-search" placeholder="اسم المستخدم..." oninput="debounce('admin-tx', renderAdminTransactions)">
+          </div>
+        </div>
+      </div>
+      <div id="admin-transactions"></div>
+    </div>
+
+    <div id="admin-tab-reports" style="display:none;">
+      <div class="card">
+        <label>الحالة</label>
+        <select id="admin-reports-status" onchange="renderAdminReports()" style="margin-bottom:0;">
+          <option value="pending">قيد المراجعة</option>
+          <option value="resolved">تم حلها</option>
+          <option value="">الكل</option>
+        </select>
+      </div>
+      <div id="admin-reports"></div>
+    </div>
+
+    <div id="admin-tab-users" style="display:none;">
+      <div class="card">
+        <label>بحث</label>
+        <input id="admin-users-search" placeholder="الاسم أو البريد الإلكتروني..." style="margin-bottom:0;" oninput="debounce('admin-users', renderAdminUsers)">
+      </div>
+      <div id="admin-users"></div>
+    </div>
+
+    <div id="admin-tab-log" style="display:none;">
+      <div id="admin-log"></div>
+    </div>
+  </div>
+
+  <!-- ================= ADMIN: USER DETAIL (listings + reviews) ================= -->
+  <div class="screen" id="screen-admin-user">
+    <div class="topbar"><span class="back" onclick="goBack()"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="admin-user-title">المستخدم</h2></div>
+    <div class="card" id="admin-user-info"></div>
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:10px;">إعلاناته</h3>
+    <div class="listing-grid" id="admin-user-listings" style="margin-bottom:20px;"></div>
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:10px;">التقييمات المستلمة</h3>
+    <div class="card" id="admin-user-reviews"></div>
   </div>
 
   <!-- ================= NAVBAR ================= -->
