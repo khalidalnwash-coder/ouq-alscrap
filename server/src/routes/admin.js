@@ -415,6 +415,41 @@ router.patch(
   })
 );
 
+// GET /api/admin/support?status= — support tickets for the "رسائل الدعم"
+// tab, newest first.
+router.get(
+  '/support',
+  asyncHandler(async (req, res) => {
+    const { status } = req.query;
+    const result = await pool.query(
+      `SELECT sm.*, u.full_name AS user_name, u.email AS user_email
+       FROM support_messages sm JOIN users u ON u.id = sm.user_id
+       ${status ? 'WHERE sm.status = $1' : ''}
+       ORDER BY sm.created_at DESC LIMIT 200`,
+      status ? [status] : []
+    );
+    res.json({ messages: result.rows });
+  })
+);
+
+// POST /api/admin/support/:id/reply — the reply the user reads back the
+// next time they open "الدعم الفني" (see GET /api/support/mine).
+router.post(
+  '/support/:id/reply',
+  asyncHandler(async (req, res) => {
+    const { reply } = req.body || {};
+    if (!reply || !reply.trim()) return res.status(400).json({ error: 'اكتب نص الرد' });
+    const result = await pool.query(
+      `UPDATE support_messages SET admin_reply = $1, replied_at = now(), status = 'answered'
+       WHERE id = $2 RETURNING user_id, issue_type`,
+      [reply.trim(), req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'رسالة الدعم غير موجودة' });
+    await logAdminAction(req.userId, 'reply_support_message', 'ردّ على رسالة دعم فني');
+    res.json({ ok: true });
+  })
+);
+
 // GET /api/admin/actions — the audit trail itself (who/when/what).
 router.get(
   '/actions',

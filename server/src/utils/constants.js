@@ -273,6 +273,15 @@ const REPORT_REASONS_COMMENT = [
   { value: 'other', label: 'سبب آخر' },
 ];
 
+// Support ticket categories — shown as a dropdown on the "الدعم الفني" form.
+const SUPPORT_ISSUE_TYPES = [
+  { value: 'account', label: 'مشكلة في الحساب' },
+  { value: 'listing', label: 'مشكلة في إعلان' },
+  { value: 'payment', label: 'مشكلة في الدفع أو العمولة' },
+  { value: 'technical', label: 'خلل تقني في التطبيق' },
+  { value: 'other', label: 'شيء آخر' },
+];
+
 // ---------------------------------------------------------------------------
 // Transaction confirmation & commission settlement (spec Section 11).
 // COMMISSION_RATE is the pledged 2.5% from Section 9's commitment text.
@@ -312,6 +321,7 @@ module.exports = {
   REPORT_REASONS_LISTING,
   REPORT_REASONS_ACCOUNT,
   REPORT_REASONS_COMMENT,
+  SUPPORT_ISSUE_TYPES,
   COMMISSION_RATE,
   BANK_ACCOUNT,
   ARCHIVE_WARNING_DAYS,

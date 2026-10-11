@@ -272,3 +272,39 @@ CREATE TABLE IF NOT EXISTS admin_actions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_actions_created ON admin_actions (created_at DESC);
+
+-- Account self-service: edit profile + OTP-gated phone/email change.
+-- city has no CHECK against COUNTRY_CITIES (unlike listings.city) since a
+-- user's own profile city is informational only, not used to filter/match
+-- anything yet — same reasoning as age having no range check.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT;
+
+-- A phone/email change is staged here and only applied once the OTP sent to
+-- the NEW destination is verified (routes/auth.js /profile/verify-request
+-- and /profile/verify-confirm) — reusing the existing otp_code/otp_expires_at/
+-- otp_channel columns for the code itself, same as signup. At most one
+-- phone+email change can be pending at a time; starting a new request
+-- overwrites whatever was pending before it was confirmed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_phone_country_code TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_phone_number TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email TEXT;
+
+-- Support tickets submitted from "الدعم الفني" — reach the admin dashboard
+-- under a new "رسائل الدعم" tab; the admin's reply is read back by the user
+-- the next time they open the support screen (no push notifications exist
+-- yet in this app — same "loads fresh on screen open" pattern as messaging).
+CREATE TABLE IF NOT EXISTS support_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  issue_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image_url TEXT,
+  image_storage_key TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','answered')),
+  admin_reply TEXT,
+  replied_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_messages_status_created ON support_messages (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_messages_user ON support_messages (user_id, created_at DESC);

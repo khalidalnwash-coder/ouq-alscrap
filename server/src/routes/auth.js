@@ -204,6 +204,148 @@ router.patch(
   })
 );
 
+// PATCH /api/auth/profile — the two non-sensitive edit-account fields
+// (name, city): applied immediately, no OTP. Phone and email go through
+// /profile/verify-request + /profile/verify-confirm below instead.
+router.patch(
+  '/profile',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { full_name, city } = req.body || {};
+    const updates = [];
+    const params = [];
+    if (full_name !== undefined) {
+      if (!full_name.trim()) return res.status(400).json({ error: 'الاسم مطلوب' });
+      params.push(full_name.trim());
+      updates.push(`full_name = $${params.length}`);
+    }
+    if (city !== undefined) {
+      params.push(city ? city.trim() : null);
+      updates.push(`city = $${params.length}`);
+    }
+    if (!updates.length) return res.status(400).json({ error: 'لا يوجد تعديل لحفظه' });
+    params.push(req.userId);
+    const result = await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+    res.json({ user: serializeUser(result.rows[0]) });
+  })
+);
+
+// POST /api/auth/profile/verify-request — stage a phone and/or email change
+// and send an OTP to confirm it, exactly like signup's OTP step. Accepts
+// either or both at once (one shared code confirms whichever is pending).
+router.post(
+  '/profile/verify-request',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { phone_country_code, phone_number, email, otp_channel } = req.body || {};
+    if (!phone_number && !email) {
+      return res.status(400).json({ error: 'أدخل رقم جوال أو بريد إلكتروني جديد' });
+    }
+    if (phone_number && !phone_country_code) {
+      return res.status(400).json({ error: 'مفتاح الجوال مطلوب' });
+    }
+    if (phone_country_code && !Object.values(COUNTRY_PHONE_CODE).includes(phone_country_code)) {
+      return res.status(400).json({ error: 'مفتاح جوال غير صالح' });
+    }
+    if (!['whatsapp', 'email'].includes(otp_channel)) {
+      return res.status(400).json({ error: 'اختر طريقة استلام كود التحقق' });
+    }
+
+    let normalizedEmail = null;
+    if (email) {
+      normalizedEmail = email.trim().toLowerCase();
+      const existing = await pool.query('SELECT id FROM users WHERE LOWER(TRIM(email)) = $1 AND id != $2', [
+        normalizedEmail,
+        req.userId,
+      ]);
+      if (existing.rows[0]) return res.status(409).json({ error: 'هذا البريد الإلكتروني مستخدم بالفعل' });
+    }
+
+    const code = generateOtp();
+    await pool.query(
+      `UPDATE users SET otp_code=$1, otp_expires_at=$2, otp_channel=$3,
+         pending_phone_country_code=$4, pending_phone_number=$5, pending_email=$6
+       WHERE id=$7`,
+      [code, otpExpiry(), otp_channel, phone_number ? phone_country_code : null, phone_number || null, normalizedEmail, req.userId]
+    );
+
+    const user = await findByUserId(req.userId);
+    const destination =
+      otp_channel === 'whatsapp'
+        ? phone_number
+          ? `${phone_country_code}${phone_number}`
+          : `${user.phone_country_code}${user.phone_number}`
+        : normalizedEmail || user.email;
+    sendOtpMock({ channel: otp_channel, destination, code });
+
+    res.json({ otp_destination: destination, dev_otp_code: code });
+  })
+);
+
+// POST /api/auth/profile/verify-confirm — apply whatever phone/email is
+// currently staged, once the code sent above is verified.
+router.post(
+  '/profile/verify-confirm',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { code } = req.body || {};
+    const user = await findByUserId(req.userId);
+    if (!user.otp_code || user.otp_code !== code) {
+      return res.status(400).json({ error: 'كود التحقق غير صحيح' });
+    }
+    if (new Date(user.otp_expires_at) < new Date()) {
+      return res.status(400).json({ error: 'انتهت صلاحية الكود، اطلب كوداً جديداً' });
+    }
+    if (!user.pending_phone_number && !user.pending_email) {
+      return res.status(400).json({ error: 'لا يوجد تغيير معلّق لتأكيده' });
+    }
+
+    const updates = [
+      'otp_code = NULL',
+      'otp_expires_at = NULL',
+      'pending_phone_country_code = NULL',
+      'pending_phone_number = NULL',
+      'pending_email = NULL',
+    ];
+    const params = [];
+    if (user.pending_phone_number) {
+      params.push(user.pending_phone_country_code);
+      updates.push(`phone_country_code = $${params.length}`);
+      params.push(user.pending_phone_number);
+      updates.push(`phone_number = $${params.length}`);
+    }
+    if (user.pending_email) {
+      params.push(user.pending_email);
+      updates.push(`email = $${params.length}`);
+    }
+    params.push(req.userId);
+    const result = await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+    res.json({ user: serializeUser(result.rows[0]) });
+  })
+);
+
+// POST /api/auth/change-password — current password re-entry required,
+// same reasoning as account deletion's password re-confirmation.
+router.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { current_password, new_password } = req.body || {};
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'الرجاء تعبئة كل الحقول' });
+    }
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' });
+    }
+    const user = await findByUserId(req.userId);
+    const ok = await bcrypt.compare(current_password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+    const passwordHash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.userId]);
+    res.json({ ok: true });
+  })
+);
+
 router.post(
   '/login',
   asyncHandler(async (req, res) => {

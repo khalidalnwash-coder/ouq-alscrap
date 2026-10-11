@@ -11,6 +11,7 @@ function serializeUser(u) {
     email: u.email,
     age: u.age,
     country: u.country,
+    city: u.city,
     otp_verified_channel: u.otp_verified_channel,
     verified_at: u.verified_at,
     terms_accepted_at: u.terms_accepted_at,
