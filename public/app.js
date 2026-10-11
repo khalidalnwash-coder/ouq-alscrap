@@ -6,7 +6,7 @@ let chosenOtpMethod = 'whatsapp';
 let chosenFpMethod = 'whatsapp';
 let fpUserId = null;
 let currentUser = null;
-let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, commission_rate: 0.025, bank_account: null };
+let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null };
 const COUNTRY_KEY = 'alscrap_country';
 let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
@@ -114,6 +114,9 @@ function go(id) {
   if (id === 'messages') renderMessagesList();
   if (id === 'privacy') renderPrivacyPolicy();
   if (id === 'terms-view') renderTermsView();
+  if (id === 'edit-profile') renderEditProfile();
+  if (id === 'change-password') renderChangePassword();
+  if (id === 'support') renderSupport();
   window.scrollTo(0, 0);
 }
 function goBack() {
@@ -165,7 +168,7 @@ async function bootstrap() {
   try {
     meta = await api('/listings/meta');
   } catch {
-    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, commission_rate: 0.025, bank_account: null };
+    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null };
   }
   populateMetaSelects();
 
@@ -1876,6 +1879,194 @@ async function togglePhoneVisibility() {
   }
 }
 
+// ---------- edit account profile (name/phone/city/email, OTP-gated for phone+email) ----------
+let epOriginal = null;
+let epOtpChannel = 'whatsapp';
+let epPendingHasPhone = false;
+let epPendingHasEmail = false;
+function renderEditProfile() {
+  epOriginal = { full_name: currentUser.full_name, phone_country_code: currentUser.phone_country_code, phone_number: currentUser.phone_number, email: currentUser.email, city: currentUser.city || '' };
+  document.getElementById('ep-name').value = currentUser.full_name;
+  document.getElementById('ep-code').innerHTML = phoneCodeOptionsHtml(currentUser.phone_country_code);
+  document.getElementById('ep-phone').value = currentUser.phone_number;
+  document.getElementById('ep-email').value = currentUser.email;
+  const cities = meta.cities_by_country[currentUser.country] || [];
+  document.getElementById('ep-city').innerHTML =
+    '<option value="">— بدون تحديد —</option>' + cities.map((c) => `<option ${c === currentUser.city ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+  selectEpOtpChannel('whatsapp');
+  hideError('ep-error1');
+  hideError('ep-error2');
+  document.getElementById('ep-step1').style.display = 'block';
+  document.getElementById('ep-step2').style.display = 'none';
+}
+function selectEpOtpChannel(channel) {
+  epOtpChannel = channel;
+  document.getElementById('ep-channel-whatsapp').classList.toggle('selected', channel === 'whatsapp');
+  document.getElementById('ep-channel-email').classList.toggle('selected', channel === 'email');
+}
+async function submitEditProfile() {
+  hideError('ep-error1');
+  const name = document.getElementById('ep-name').value.trim();
+  const code = document.getElementById('ep-code').value;
+  const phone = document.getElementById('ep-phone').value.trim();
+  const email = document.getElementById('ep-email').value.trim();
+  const city = document.getElementById('ep-city').value;
+  if (!name) return showError('ep-error1', 'الاسم مطلوب');
+  if (!phone) return showError('ep-error1', 'رقم الجوال مطلوب');
+  if (!email) return showError('ep-error1', 'البريد الإلكتروني مطلوب');
+
+  const nameChanged = name !== epOriginal.full_name;
+  const cityChanged = city !== epOriginal.city;
+  const phoneChanged = phone !== epOriginal.phone_number || code !== epOriginal.phone_country_code;
+  const emailChanged = email.toLowerCase() !== epOriginal.email.toLowerCase();
+
+  if (!nameChanged && !cityChanged && !phoneChanged && !emailChanged) {
+    toast('لا يوجد تعديل');
+    return go('profile');
+  }
+
+  const btn = document.getElementById('ep-submit');
+  btn.disabled = true;
+  try {
+    if (nameChanged || cityChanged) {
+      const body = {};
+      if (nameChanged) body.full_name = name;
+      if (cityChanged) body.city = city;
+      const res = await api('/auth/profile', { method: 'PATCH', body });
+      currentUser = res.user;
+    }
+    if (phoneChanged || emailChanged) {
+      const body = { otp_channel: epOtpChannel };
+      if (phoneChanged) { body.phone_country_code = code; body.phone_number = phone; }
+      if (emailChanged) body.email = email;
+      epPendingHasPhone = phoneChanged;
+      epPendingHasEmail = emailChanged;
+      const res = await api('/auth/profile/verify-request', { method: 'POST', body });
+      document.getElementById('ep-otp-destination').textContent = res.otp_destination;
+      document.getElementById('ep-step1').style.display = 'none';
+      document.getElementById('ep-step2').style.display = 'block';
+      document.querySelectorAll('#ep-step2 .otp-row input').forEach((inp) => (inp.value = ''));
+      document.querySelector('#ep-step2 .otp-row input').focus();
+      if (nameChanged || cityChanged) toast('تم حفظ الاسم/المدينة، أكمل تأكيد الجوال/البريد');
+    } else {
+      toast('تم حفظ التغييرات');
+      go('profile');
+    }
+  } catch (err) {
+    showError('ep-error1', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function confirmEditProfileOtp() {
+  hideError('ep-error2');
+  const code = Array.from(document.querySelectorAll('#ep-step2 .otp-row input')).map((i) => i.value).join('');
+  if (code.length !== 4) return showError('ep-error2', 'أدخل الكود كاملاً');
+  try {
+    const res = await api('/auth/profile/verify-confirm', { method: 'POST', body: { code } });
+    currentUser = res.user;
+    toast('تم تأكيد وتحديث بياناتك');
+    go('profile');
+  } catch (err) {
+    showError('ep-error2', err.message);
+  }
+}
+
+// ---------- change password ----------
+function renderChangePassword() {
+  document.getElementById('cp-current').value = '';
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-confirm').value = '';
+  hideError('cp-error');
+}
+async function submitChangePassword() {
+  hideError('cp-error');
+  const current = document.getElementById('cp-current').value;
+  const next = document.getElementById('cp-new').value;
+  const confirm_ = document.getElementById('cp-confirm').value;
+  if (!current || !next || !confirm_) return showError('cp-error', 'الرجاء تعبئة كل الحقول');
+  if (next.length < 8) return showError('cp-error', 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل');
+  if (next !== confirm_) return showError('cp-error', 'كلمة المرور الجديدة وتأكيدها غير متطابقين');
+  try {
+    await api('/auth/change-password', { method: 'POST', body: { current_password: current, new_password: next } });
+    toast('تم تغيير كلمة المرور');
+    go('profile');
+  } catch (err) {
+    showError('cp-error', err.message);
+  }
+}
+
+// ---------- support (self-service tickets, reaches admin's "رسائل الدعم" tab) ----------
+const SUPPORT_STATUS_LABELS = { open: 'بانتظار الرد', answered: 'تم الرد' };
+let supportImageFile = null;
+async function renderSupport() {
+  document.getElementById('sup-issue-type').innerHTML = (meta.support_issue_types || [])
+    .map((t) => `<option value="${t.value}">${escapeHtml(t.label)}</option>`)
+    .join('');
+  document.getElementById('sup-description').value = '';
+  supportImageFile = null;
+  document.getElementById('sup-thumb').innerHTML = '';
+  hideError('sup-error');
+  await renderSupportMine();
+}
+async function onSupportImageSelected(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!['image/jpeg', 'image/png'].includes(file.type)) return toast('الصورة يجب أن تكون JPG أو PNG');
+  if (file.size > MAX_ORIGINAL_IMAGE_MB * 1024 * 1024) return toast('الصورة كبيرة جداً');
+  try {
+    supportImageFile = await compressImageFile(file);
+    document.getElementById('sup-thumb').innerHTML = `<div class="thumb"><img src="${URL.createObjectURL(supportImageFile)}"><span class="rm" onclick="removeSupportImage()">${icon('x')}</span></div>`;
+    refreshIcons();
+  } catch {
+    toast('تعذّر معالجة الصورة');
+  }
+}
+function removeSupportImage() {
+  supportImageFile = null;
+  document.getElementById('sup-thumb').innerHTML = '';
+}
+async function submitSupportMessage() {
+  hideError('sup-error');
+  const issue_type = document.getElementById('sup-issue-type').value;
+  const description = document.getElementById('sup-description').value.trim();
+  if (!description) return showError('sup-error', 'اكتب وصف المشكلة');
+  const fd = new FormData();
+  fd.append('issue_type', issue_type);
+  fd.append('description', description);
+  if (supportImageFile) fd.append('image', supportImageFile);
+  try {
+    await api('/support', { method: 'POST', isForm: true, body: fd });
+    toast('تم إرسال رسالتك، سنرد عليك قريباً');
+    document.getElementById('sup-description').value = '';
+    removeSupportImage();
+    await renderSupportMine();
+  } catch (err) {
+    showError('sup-error', err.message);
+  }
+}
+async function renderSupportMine() {
+  const el = document.getElementById('sup-my-messages');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+  try {
+    const { messages } = await api('/support/mine');
+    el.innerHTML = messages.length ? messages.map((m) => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
+          <span class="badge ${m.status === 'answered' ? 'badge-success' : 'badge-warning'}">${SUPPORT_STATUS_LABELS[m.status]}</span>
+          <span class="muted" style="font-size:var(--fs-xs);">${timeAgoFull(m.created_at)}</span>
+        </div>
+        <p style="font-size:var(--fs-sm); line-height:1.6; margin-bottom:6px;">${escapeHtml(m.description)}</p>
+        ${m.image_url ? `<img src="${m.image_url}" style="max-width:100%; border-radius:var(--radius-sm); margin-bottom:8px;">` : ''}
+        ${m.admin_reply ? `<div style="background:var(--blue-light); border-radius:var(--radius-sm); padding:10px 12px;"><p class="muted" style="font-size:var(--fs-xs); margin-bottom:3px;">رد الدعم الفني</p><p style="font-size:var(--fs-sm); color:var(--blue);">${escapeHtml(m.admin_reply)}</p></div>` : ''}
+      </div>
+    `).join('') : '<p class="muted center">ما أرسلت أي رسالة دعم بعد</p>';
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
 // ---------- admin ----------
 const REPORT_REASON_LABEL_MAP = {}; // filled lazily from meta.report_reasons on first admin render
 function reportReasonLabel(reason) {
@@ -1891,6 +2082,7 @@ const ADMIN_ACTION_LABELS = {
   suspend_user: 'إيقاف حساب', activate_user: 'تفعيل حساب', dismiss_report: 'تجاهل بلاغ',
   delete_reported_content: 'حذف محتوى مبلّغ عنه', delete_listing: 'حذف إعلان', delete_comment: 'حذف تعليق',
   hide_review: 'إخفاء تقييم', unhide_review: 'إظهار تقييم', update_payment_status: 'تحديث حالة دفعة',
+  reply_support_message: 'الرد على رسالة دعم',
 };
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString('ar', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1904,7 +2096,7 @@ function debounce(key, fn, delay = 300) {
 let adminTab = 'overview';
 function switchAdminTab(tab) {
   adminTab = tab;
-  ['overview', 'commissions', 'reports', 'users', 'log'].forEach((t) => {
+  ['overview', 'commissions', 'reports', 'users', 'support', 'log'].forEach((t) => {
     document.getElementById('atab-btn-' + t).classList.toggle('active', t === tab);
     document.getElementById('admin-tab-' + t).style.display = t === tab ? 'block' : 'none';
   });
@@ -1912,6 +2104,7 @@ function switchAdminTab(tab) {
   if (tab === 'commissions') renderAdminTransactions();
   if (tab === 'reports') renderAdminReports();
   if (tab === 'users') renderAdminUsers();
+  if (tab === 'support') renderAdminSupport();
   if (tab === 'log') renderAdminLog();
 }
 function renderAdmin() {
@@ -2178,6 +2371,44 @@ async function adminDeleteComment(id) {
     await api('/admin/comments/' + id, { method: 'DELETE' });
     toast('تم حذف التعليق');
     renderComments();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// ---------- admin: support messages ----------
+async function renderAdminSupport() {
+  const el = document.getElementById('admin-support');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
+  const status = document.getElementById('admin-support-status').value;
+  try {
+    const { messages } = await api('/admin/support' + (status ? '?status=' + status : ''));
+    el.innerHTML = messages.length ? messages.map((m) => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
+          <div><p style="font-weight:700; font-size:var(--fs-sm);">${escapeHtml(m.user_name)}</p><p class="muted" style="font-size:var(--fs-xs);">${escapeHtml(m.user_email)}</p></div>
+          <span class="badge ${m.status === 'answered' ? 'badge-success' : 'badge-warning'}">${SUPPORT_STATUS_LABELS[m.status]}</span>
+        </div>
+        <p class="muted" style="font-size:var(--fs-xs); margin-bottom:4px;">${escapeHtml((meta.support_issue_types.find((t) => t.value === m.issue_type) || {}).label || m.issue_type)} · ${formatDateTime(m.created_at)}</p>
+        <p style="font-size:var(--fs-sm); line-height:1.6; margin-bottom:8px;">${escapeHtml(m.description)}</p>
+        ${m.image_url ? `<img src="${m.image_url}" style="max-width:100%; border-radius:var(--radius-sm); margin-bottom:8px;">` : ''}
+        ${m.admin_reply ? `<div style="background:var(--blue-light); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px;"><p class="muted" style="font-size:var(--fs-xs); margin-bottom:3px;">ردّك</p><p style="font-size:var(--fs-sm); color:var(--blue);">${escapeHtml(m.admin_reply)}</p></div>` : ''}
+        <textarea id="support-reply-${m.id}" placeholder="اكتب ردك هنا..." style="min-height:60px;"></textarea>
+        <button class="btn-outline" onclick="replySupportMessage('${m.id}')">${m.admin_reply ? 'تحديث الرد' : 'إرسال الرد'}</button>
+      </div>
+    `).join('') : '<p class="muted center">لا توجد رسائل دعم</p>';
+  } catch (err) {
+    el.innerHTML = `<p class="muted">تعذّر تحميل البيانات: ${escapeHtml(err.message)}</p>`;
+  }
+}
+async function replySupportMessage(id) {
+  const textarea = document.getElementById('support-reply-' + id);
+  const reply = textarea.value.trim();
+  if (!reply) return toast('اكتب نص الرد');
+  try {
+    await api('/admin/support/' + id + '/reply', { method: 'POST', body: { reply } });
+    toast('تم إرسال الرد');
+    renderAdminSupport();
   } catch (err) {
     toast(err.message);
   }

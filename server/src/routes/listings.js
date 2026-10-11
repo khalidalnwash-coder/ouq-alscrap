@@ -19,6 +19,7 @@ const {
   REPORT_REASONS_LISTING,
   REPORT_REASONS_ACCOUNT,
   REPORT_REASONS_COMMENT,
+  SUPPORT_ISSUE_TYPES,
   COMMISSION_RATE,
   BANK_ACCOUNT,
   ARCHIVE_WARNING_DAYS,
@@ -128,6 +129,7 @@ router.get('/meta', (_req, res) => {
       ])
     ),
     report_reasons: { listing: REPORT_REASONS_LISTING, account: REPORT_REASONS_ACCOUNT, comment: REPORT_REASONS_COMMENT },
+    support_issue_types: SUPPORT_ISSUE_TYPES,
     commission_rate: COMMISSION_RATE,
     bank_account: BANK_ACCOUNT,
     bump_cooldown_hours: BUMP_COOLDOWN_HOURS,

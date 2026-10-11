@@ -679,10 +679,10 @@
       </div>
       <div class="settings-row" onclick="go('my-listings')"><i data-lucide="list" class="icon"></i><span>إعلاناتي</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="openDealConfirmStandalone()"><i data-lucide="handshake" class="icon"></i><span>تأكيد صفقة وتسديد عمولة</span><i data-lucide="chevron-left" class="icon chev"></i></div>
-      <div class="settings-row" onclick="toast('قريباً')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('edit-profile')"><i data-lucide="user" class="icon"></i><span>تعديل بيانات الحساب</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="toggleNotifRow()"><i data-lucide="bell" class="icon"></i><span>الإشعارات: <b id="notif-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="togglePhoneVisibility()"><i data-lucide="phone" class="icon"></i><span>رقم الجوال للمشترين: <b id="phone-visible-state">—</b></span><i data-lucide="chevron-left" class="icon chev"></i></div>
-      <div class="settings-row" onclick="go('forgot')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
+      <div class="settings-row" onclick="go('change-password')"><i data-lucide="lock" class="icon"></i><span>تغيير كلمة المرور</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('support')"><i data-lucide="headphones" class="icon"></i><span>الدعم الفني</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('terms-view')"><i data-lucide="file-text" class="icon"></i><span>الشروط والأحكام</span><i data-lucide="chevron-left" class="icon chev"></i></div>
       <div class="settings-row" onclick="go('privacy')"><i data-lucide="shield-check" class="icon"></i><span>سياسة الخصوصية</span><i data-lucide="chevron-left" class="icon chev"></i></div>
@@ -720,6 +720,65 @@
     </div>
   </div>
 
+  <!-- ================= EDIT ACCOUNT PROFILE ================= -->
+  <div class="screen" id="screen-edit-profile">
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>تعديل بيانات الحساب</h2></div>
+    <div class="card" id="ep-step1">
+      <label>الاسم الكامل</label>
+      <input id="ep-name">
+
+      <label>رقم الجوال</label>
+      <div class="row2">
+        <div style="flex:0 0 118px;">
+          <select id="ep-code"></select>
+        </div>
+        <div><input id="ep-phone" placeholder="5XXXXXXXX"></div>
+      </div>
+
+      <label>البريد الإلكتروني</label>
+      <input id="ep-email" type="email">
+
+      <label>المدينة</label>
+      <select id="ep-city"></select>
+
+      <p class="muted" style="font-size:var(--fs-xs); margin:-6px 0 14px; display:flex; align-items:flex-start; gap:6px;">
+        <i data-lucide="info" class="icon icon-xs icon-muted" style="margin-top:1px; flex-shrink:0;"></i>
+        <span>تغيير رقم الجوال أو البريد الإلكتروني يحتاج تأكيد برمز يُرسل لك، مثل التسجيل.</span>
+      </p>
+      <div class="toggle-group" id="ep-otp-channel">
+        <div class="toggle-opt selected" id="ep-channel-whatsapp" onclick="selectEpOtpChannel('whatsapp')">تأكيد عبر واتساب</div>
+        <div class="toggle-opt" id="ep-channel-email" onclick="selectEpOtpChannel('email')">تأكيد عبر بريد إلكتروني</div>
+      </div>
+
+      <p class="error-text" id="ep-error1" style="display:none;"></p>
+      <button class="btn-primary" id="ep-submit" onclick="submitEditProfile()">حفظ التغييرات</button>
+    </div>
+    <div class="card" id="ep-step2" style="display:none;">
+      <p class="muted" style="margin-bottom:14px;">أرسلنا كود التحقق إلى <b id="ep-otp-destination" style="color:var(--text);"></b></p>
+      <div class="otp-row">
+        <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+      </div>
+      <p class="error-text" id="ep-error2" style="display:none;"></p>
+      <button class="btn-primary" onclick="confirmEditProfileOtp()">تأكيد التغيير</button>
+    </div>
+  </div>
+
+  <!-- ================= CHANGE PASSWORD ================= -->
+  <div class="screen" id="screen-change-password">
+    <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>تغيير كلمة المرور</h2></div>
+    <div class="card">
+      <label>كلمة المرور الحالية</label>
+      <input id="cp-current" type="password" placeholder="••••••••">
+      <label>كلمة المرور الجديدة</label>
+      <input id="cp-new" type="password" placeholder="8 أحرف على الأقل">
+      <label>تأكيد كلمة المرور الجديدة</label>
+      <input id="cp-confirm" type="password" placeholder="أعد كتابة كلمة المرور الجديدة">
+      <p class="error-text" id="cp-error" style="display:none;"></p>
+      <button class="btn-primary" onclick="submitChangePassword()">تغيير كلمة المرور</button>
+      <p class="center muted" style="margin-top:14px;">نسيت كلمة المرور الحالية؟ <span class="link" onclick="go('forgot')">استعادتها بكود تحقق</span></p>
+    </div>
+  </div>
+
   <!-- ================= SUPPORT ================= -->
   <div class="screen" id="screen-support">
     <div class="topbar"><span class="back" onclick="go('profile')"><i data-lucide="chevron-right" class="icon"></i></span><h2>الدعم الفني</h2></div>
@@ -736,6 +795,27 @@
       </div>
       <p class="muted">أوقات الرد: يومياً 9ص - 9م</p>
     </div>
+
+    <div class="card">
+      <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:14px;">أرسل رسالة للدعم الفني</h3>
+      <label>نوع المشكلة</label>
+      <select id="sup-issue-type"></select>
+      <label>وصف المشكلة</label>
+      <textarea id="sup-description" placeholder="اشرح مشكلتك بالتفصيل..."></textarea>
+      <label>صورة (اختياري)</label>
+      <div class="upload-drop" onclick="document.getElementById('sup-image').click()">
+        <i data-lucide="camera" class="icon"></i>
+        اضغط لإضافة صورة
+        <small>لقطة شاشة أو صورة توضح المشكلة</small>
+      </div>
+      <input id="sup-image" type="file" accept="image/*" style="display:none" onchange="onSupportImageSelected(event)">
+      <div class="thumb-strip" id="sup-thumb"></div>
+      <p class="error-text" id="sup-error" style="display:none;"></p>
+      <button class="btn-primary" onclick="submitSupportMessage()">إرسال</button>
+    </div>
+
+    <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:10px;">رسائلي السابقة</h3>
+    <div id="sup-my-messages"></div>
   </div>
 
   <!-- ================= ADMIN ================= -->
@@ -747,6 +827,7 @@
       <div class="tab-btn" id="atab-btn-commissions" onclick="switchAdminTab('commissions')">العمولات</div>
       <div class="tab-btn" id="atab-btn-reports" onclick="switchAdminTab('reports')">البلاغات</div>
       <div class="tab-btn" id="atab-btn-users" onclick="switchAdminTab('users')">المستخدمين</div>
+      <div class="tab-btn" id="atab-btn-support" onclick="switchAdminTab('support')">الدعم</div>
       <div class="tab-btn" id="atab-btn-log" onclick="switchAdminTab('log')">السجل</div>
     </div>
 
@@ -793,6 +874,18 @@
         <input id="admin-users-search" placeholder="الاسم أو البريد الإلكتروني..." style="margin-bottom:0;" oninput="debounce('admin-users', renderAdminUsers)">
       </div>
       <div id="admin-users"></div>
+    </div>
+
+    <div id="admin-tab-support" style="display:none;">
+      <div class="card">
+        <label>الحالة</label>
+        <select id="admin-support-status" onchange="renderAdminSupport()" style="margin-bottom:0;">
+          <option value="open">جديدة</option>
+          <option value="answered">تم الرد عليها</option>
+          <option value="">الكل</option>
+        </select>
+      </div>
+      <div id="admin-support"></div>
     </div>
 
     <div id="admin-tab-log" style="display:none;">

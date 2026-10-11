@@ -10,6 +10,7 @@ const adminRoutes = require('./routes/admin');
 const reportsRoutes = require('./routes/reports');
 const transactionsRoutes = require('./routes/transactions');
 const conversationsRoutes = require('./routes/conversations');
+const supportRoutes = require('./routes/support');
 const { uploadsDir, storageStatus } = require('./utils/storage');
 const { runArchivalSweep } = require('./jobs/archival');
 
@@ -32,6 +33,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/conversations', conversationsRoutes);
+app.use('/api/support', supportRoutes);
 
 // storage below reports the media-upload driver actually running — never
 // secrets, just enough to confirm from a browser/curl whether Cloudinary is
