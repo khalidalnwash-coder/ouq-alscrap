@@ -8,7 +8,11 @@ let fpUserId = null;
 let currentUser = null;
 let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null };
 const COUNTRY_KEY = 'alscrap_country';
-let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
+// '' means "كل الدول" (browsing/searching across every GCC country) — an
+// explicit, intentional choice, so a stored '' must NOT fall back to 'SA'
+// the way a genuinely-missing key does (hence the !== null check, not ||).
+const storedBrowsingCountry = localStorage.getItem(COUNTRY_KEY);
+let browsingCountry = storedBrowsingCountry !== null ? storedBrowsingCountry : 'SA';
 let selectedPartCategory = '';
 let selectedSearchYear = '';
 let selectedSearchCity = null; // null = not yet defaulted to the user's own city this session
@@ -203,10 +207,34 @@ function cityFilterOptionsHtml(country, selectedCity) {
 function userDefaultCity(country) {
   return currentUser && currentUser.city && (meta.cities_by_country[country] || []).includes(currentUser.city) ? currentUser.city : '';
 }
+// Shared empty-results state for every filterable results grid (search,
+// vehicle sections). When a city and/or a specific country narrowed the
+// search to zero results, offers one-click buttons to widen it; otherwise
+// (already "كل الدول" with no narrower filter to drop) falls back to the
+// screen's own plain empty message.
+function noResultsHtml(hasCity, hasCountry, widenCityCall, widenCountryCall, fallbackMessage) {
+  if (!hasCity && !hasCountry) return `<p class="muted" style="grid-column:1/-1;">${escapeHtml(fallbackMessage)}</p>`;
+  const cityBtn = hasCity
+    ? `<button class="btn-outline" style="width:auto; padding:9px 16px;" onclick="${widenCityCall}">ابحث في كل مدن الدولة</button>`
+    : '';
+  const countryBtn = hasCountry
+    ? `<button class="btn-outline" style="width:auto; padding:9px 16px;" onclick="${widenCountryCall}">ابحث في كل الدول</button>`
+    : '';
+  return `<div class="muted" style="grid-column:1/-1; text-align:center; padding:20px 0;">
+    <p style="margin-bottom:14px;">ما لقينا نتائج هنا</p>
+    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">${cityBtn}${countryBtn}</div>
+  </div>`;
+}
 function countryOptionsHtml(selectedCode) {
   return meta.countries
     .map((c) => `<option value="${c.code}" ${c.code === selectedCode ? 'selected' : ''}>${c.flag} ${escapeHtml(c.label)}</option>`)
     .join('');
+}
+// Same list, but with a "كل الدول" option first — only for the browsing
+// selectors (home/search), never for signup or create-listing, which must
+// always have one specific real country.
+function browsingCountryOptionsHtml(selectedCode) {
+  return `<option value="" ${selectedCode === '' ? 'selected' : ''}>كل الدول</option>` + countryOptionsHtml(selectedCode);
 }
 function phoneCodeOptionsHtml(selectedCode) {
   return meta.countries
@@ -282,8 +310,8 @@ function populateMetaSelects() {
   document.getElementById('su-code').innerHTML = phoneCodeOptionsHtml(countryInfo(browsingCountry)?.phone_code);
   onSignupCountryChange();
   document.getElementById('cl-country').innerHTML = countryOptionsHtml(browsingCountry);
-  document.getElementById('home-country').innerHTML = countryOptionsHtml(browsingCountry);
-  document.getElementById('search-country').innerHTML = countryOptionsHtml(browsingCountry);
+  document.getElementById('home-country').innerHTML = browsingCountryOptionsHtml(browsingCountry);
+  document.getElementById('search-country').innerHTML = browsingCountryOptionsHtml(browsingCountry);
   onCreateCountryChange();
 
   const partCat = document.getElementById('cl-part-category');
@@ -582,12 +610,15 @@ function listingCard(l, opts = {}) {
     }
   }
 
+  // Shown on every card — not just when browsing "كل الدول" — so a buyer
+  // always knows which GCC country a listing is in, not only its city.
+  const flag = countryInfo(l.country)?.flag || '';
   return `<div class="listing-card" onclick="openDetail('${l.id}')">
     <div class="listing-thumb">${thumb}</div>
     <div class="listing-info">
       <div class="title">${escapeHtml(l.title)}</div>
       <div class="price">${formatPrice(l.price, l.currency)}</div>
-      <div class="loc">${icon('map-pin')} ${escapeHtml(l.city)}</div>
+      <div class="loc">${icon('map-pin')} ${flag ? flag + ' ' : ''}${escapeHtml(l.city)}</div>
       ${statusBadge}
       ${actionsHtml}
     </div>
@@ -674,15 +705,35 @@ function debouncedSearch() {
   searchDebounceTimer = setTimeout(renderSearch, 300);
 }
 function populateSearchCityFilter() {
+  const citySelect = document.getElementById('search-city');
+  if (!browsingCountry) {
+    // "كل الدول" selected — a single city doesn't apply across multiple
+    // countries, so the city filter is hidden entirely rather than shown
+    // empty or disabled.
+    selectedSearchCity = '';
+    citySelect.style.display = 'none';
+    citySelect.innerHTML = '';
+    return;
+  }
+  citySelect.style.display = '';
   // Only the very first time this screen is populated in a session, default
   // to the user's own city (if it belongs to the current country) — after
   // that, whatever is selected (by the user, or cleared by a country
   // change) is left alone.
   if (selectedSearchCity === null) selectedSearchCity = userDefaultCity(browsingCountry);
-  document.getElementById('search-city').innerHTML = cityFilterOptionsHtml(browsingCountry, selectedSearchCity);
+  citySelect.innerHTML = cityFilterOptionsHtml(browsingCountry, selectedSearchCity);
 }
 function onSearchCityChange() {
   selectedSearchCity = document.getElementById('search-city').value;
+  renderSearch();
+}
+function widenSearchCityToCountry() {
+  selectedSearchCity = '';
+  renderSearch();
+}
+function widenSearchToAllCountries() {
+  setBrowsingCountry('');
+  selectedSearchCity = '';
   renderSearch();
 }
 async function renderSearch() {
@@ -704,7 +755,9 @@ async function renderSearch() {
   try {
     const { listings } = await api('/listings?' + params.toString());
     document.getElementById('cat-count').textContent = listings.length + ' نتيجة';
-    el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد نتائج بعد</p>';
+    el.innerHTML = listings.length
+      ? listings.map(listingCard).join('')
+      : noResultsHtml(!!selectedSearchCity, !!browsingCountry, 'widenSearchCityToCountry()', 'widenSearchToAllCountries()', 'لا توجد نتائج بعد');
     refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر تحميل النتائج</p>';
@@ -774,10 +827,28 @@ function renderVehicleBrowse() {
   switchVehicleTab(vehicleTab);
 }
 function populateVehicleCityFilter() {
-  document.getElementById('vehicle-city-filter').innerHTML = cityFilterOptionsHtml(browsingCountry, selectedVehicleCity);
+  const citySelect = document.getElementById('vehicle-city-filter');
+  if (!browsingCountry) {
+    // "كل الدول" selected — same reasoning as populateSearchCityFilter.
+    selectedVehicleCity = '';
+    citySelect.style.display = 'none';
+    citySelect.innerHTML = '';
+    return;
+  }
+  citySelect.style.display = '';
+  citySelect.innerHTML = cityFilterOptionsHtml(browsingCountry, selectedVehicleCity);
 }
 function onVehicleCityChange() {
   selectedVehicleCity = document.getElementById('vehicle-city-filter').value;
+  if (vehicleTab === 'part') renderVehicleParts(); else renderVehicleWhole();
+}
+function widenVehicleCityToCountry() {
+  selectedVehicleCity = '';
+  if (vehicleTab === 'part') renderVehicleParts(); else renderVehicleWhole();
+}
+function widenVehicleToAllCountries() {
+  setBrowsingCountry('');
+  selectedVehicleCity = '';
   if (vehicleTab === 'part') renderVehicleParts(); else renderVehicleWhole();
 }
 function switchVehicleTab(tab) {
@@ -829,7 +900,9 @@ async function renderVehicleParts() {
   try {
     const { listings } = await api('/listings?' + params.toString());
     document.getElementById('vehicle-parts-count').textContent = listings.length + ' نتيجة';
-    el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد قطع بعد</p>';
+    el.innerHTML = listings.length
+      ? listings.map(listingCard).join('')
+      : noResultsHtml(!!selectedVehicleCity, !!browsingCountry, 'widenVehicleCityToCountry()', 'widenVehicleToAllCountries()', 'لا توجد قطع بعد');
     refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر تحميل القطع</p>';
@@ -851,7 +924,9 @@ async function renderVehicleWhole() {
   try {
     const { listings } = await api('/listings?' + params.toString());
     document.getElementById('vehicle-whole-count').textContent = listings.length + ' نتيجة';
-    el.innerHTML = listings.length ? listings.map(listingCard).join('') : '<p class="muted" style="grid-column:1/-1;">لا توجد مركبات معروضة بعد</p>';
+    el.innerHTML = listings.length
+      ? listings.map(listingCard).join('')
+      : noResultsHtml(!!selectedVehicleCity, !!browsingCountry, 'widenVehicleCityToCountry()', 'widenVehicleToAllCountries()', 'لا توجد مركبات معروضة بعد');
     refreshIcons();
   } catch {
     el.innerHTML = '<p class="muted" style="grid-column:1/-1;">تعذّر التحميل</p>';
