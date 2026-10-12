@@ -2,12 +2,47 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>سوق السكراب</title>
+
+<!-- PWA: installable app shell, standalone display, iOS + Android home-screen metadata -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="icons/icon-master.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="سوق السكراب">
+<!-- Matches the page background (not the brand navy) so the status bar blends
+     with whichever theme — light or dark — is currently showing. -->
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B1624">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script>
+  // Applied before first paint (and before app.js loads) so a user whose
+  // saved preference — or system setting — is dark mode never sees a flash
+  // of the light theme first, especially right after the PWA splash screen
+  // hands off to this page. app.js's own applyTheme() re-applies the same
+  // logic once it loads (harmless no-op if nothing changed since).
+  (function () {
+    try {
+      var pref = localStorage.getItem('alscrap_theme') || 'auto';
+      var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    } catch (e) { /* localStorage unavailable — styles.css's own light-theme default still applies */ }
+  })();
+</script>
 </head>
 <body>
 <div id="app">
@@ -907,6 +942,14 @@
     <div class="listing-grid" id="admin-user-listings" style="margin-bottom:20px;"></div>
     <h3 style="font-size:var(--fs-base); font-weight:700; margin-bottom:10px;">التقييمات المستلمة</h3>
     <div class="card" id="admin-user-reviews"></div>
+  </div>
+
+  <!-- ================= PWA: ADD TO HOME SCREEN HINT (iOS) / INSTALL BANNER (Android) ================= -->
+  <div class="pwa-hint" id="pwa-hint" style="display:none;">
+    <div class="pwa-hint-icon"><i data-lucide="share" class="icon icon-sm" id="pwa-hint-icon-ios" style="display:none;"></i><i data-lucide="download" class="icon icon-sm" id="pwa-hint-icon-android" style="display:none;"></i></div>
+    <p class="pwa-hint-text" id="pwa-hint-text"></p>
+    <button class="pwa-hint-install-btn" id="pwa-hint-install-btn" style="display:none;" onclick="installPwa()">تثبيت</button>
+    <span class="pwa-hint-close" onclick="dismissPwaHint()"><i data-lucide="x" class="icon icon-sm"></i></span>
   </div>
 
   <!-- ================= NAVBAR ================= -->
