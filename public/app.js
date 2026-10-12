@@ -11,6 +11,8 @@ const COUNTRY_KEY = 'alscrap_country';
 let browsingCountry = localStorage.getItem(COUNTRY_KEY) || 'SA';
 let selectedPartCategory = '';
 let selectedSearchYear = '';
+let selectedSearchCity = null; // null = not yet defaulted to the user's own city this session
+let selectedVehicleCity = '';
 let searchDebounceTimer = null;
 let currentListingId = null;
 let selectedImages = []; // File[] for create-listing
@@ -190,6 +192,17 @@ function countryInfo(code) {
 function countryByPhoneCode(phoneCode) {
   return meta.countries.find((c) => c.phone_code === phoneCode) || null;
 }
+// Shared by every city filter (search, vehicle sections): a "كل المدن"
+// option followed by the given country's cities, with one pre-selected.
+function cityFilterOptionsHtml(country, selectedCity) {
+  const cities = meta.cities_by_country[country] || [];
+  return '<option value="">كل المدن</option>' + cities.map((c) => `<option ${c === selectedCity ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+// The logged-in user's own city, if they have one set and it belongs to
+// the given country's city list — used to pre-select a browse filter.
+function userDefaultCity(country) {
+  return currentUser && currentUser.city && (meta.cities_by_country[country] || []).includes(currentUser.city) ? currentUser.city : '';
+}
 function countryOptionsHtml(selectedCode) {
   return meta.countries
     .map((c) => `<option value="${c.code}" ${c.code === selectedCode ? 'selected' : ''}>${c.flag} ${escapeHtml(c.label)}</option>`)
@@ -208,6 +221,9 @@ function setBrowsingCountry(code) {
 }
 function onBrowsingCountryChange(code) {
   setBrowsingCountry(code);
+  // Country changed, so a previously-picked (or auto-defaulted) city no
+  // longer applies — clear it back to "كل المدن".
+  selectedSearchCity = '';
   const activeId = document.querySelector('.screen.active').id;
   if (activeId === 'screen-home') renderHome();
   if (activeId === 'screen-search') renderSearch();
@@ -657,8 +673,21 @@ function debouncedSearch() {
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(renderSearch, 300);
 }
+function populateSearchCityFilter() {
+  // Only the very first time this screen is populated in a session, default
+  // to the user's own city (if it belongs to the current country) — after
+  // that, whatever is selected (by the user, or cleared by a country
+  // change) is left alone.
+  if (selectedSearchCity === null) selectedSearchCity = userDefaultCity(browsingCountry);
+  document.getElementById('search-city').innerHTML = cityFilterOptionsHtml(browsingCountry, selectedSearchCity);
+}
+function onSearchCityChange() {
+  selectedSearchCity = document.getElementById('search-city').value;
+  renderSearch();
+}
 async function renderSearch() {
   document.getElementById('search-country').value = browsingCountry;
+  populateSearchCityFilter();
   renderCatStrip();
   document.getElementById('cat-name').textContent = selectedPartCategory || 'الكل';
   const q = document.getElementById('search-q').value.trim();
@@ -668,6 +697,7 @@ async function renderSearch() {
   if (q) params.set('q', q);
   if (selectedPartCategory) params.set('part_category', selectedPartCategory);
   if (selectedSearchYear) params.set('year', selectedSearchYear);
+  if (selectedSearchCity) params.set('city', selectedSearchCity);
 
   const el = document.getElementById('search-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
@@ -737,8 +767,18 @@ function renderVehicleBrowse() {
   selectedVehicleWholeModel = '';
   selectedVehiclePartsYear = '';
   selectedVehicleWholeYear = '';
+  // Starts from the user's own city every time a vehicle section/make is
+  // (re)entered — same "fresh start" treatment as the other filters above.
+  selectedVehicleCity = userDefaultCity(browsingCountry);
   document.getElementById('vehicle-parts-q').value = '';
   switchVehicleTab(vehicleTab);
+}
+function populateVehicleCityFilter() {
+  document.getElementById('vehicle-city-filter').innerHTML = cityFilterOptionsHtml(browsingCountry, selectedVehicleCity);
+}
+function onVehicleCityChange() {
+  selectedVehicleCity = document.getElementById('vehicle-city-filter').value;
+  if (vehicleTab === 'part') renderVehicleParts(); else renderVehicleWhole();
 }
 function switchVehicleTab(tab) {
   vehicleTab = tab;
@@ -770,6 +810,7 @@ function debouncedVehiclePartsSearch() {
   vehiclePartsDebounceTimer = setTimeout(renderVehicleParts, 300);
 }
 async function renderVehicleParts() {
+  populateVehicleCityFilter();
   renderVehiclePartsCatStrip();
   selectedVehiclePartsModel = document.getElementById('vehicle-parts-model-filter').value;
   populateModelFilter('vehicle-parts-model-filter', selectedVehiclePartsModel);
@@ -781,6 +822,7 @@ async function renderVehicleParts() {
   if (selectedVehiclePartCategory) params.set('part_category', selectedVehiclePartCategory);
   if (selectedVehiclePartsModel) params.set('model', selectedVehiclePartsModel);
   if (selectedVehiclePartsYear) params.set('year', selectedVehiclePartsYear);
+  if (selectedVehicleCity) params.set('city', selectedVehicleCity);
 
   const el = document.getElementById('vehicle-parts-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
@@ -794,6 +836,7 @@ async function renderVehicleParts() {
   }
 }
 async function renderVehicleWhole() {
+  populateVehicleCityFilter();
   selectedVehicleWholeModel = document.getElementById('vehicle-whole-model-filter').value;
   populateModelFilter('vehicle-whole-model-filter', selectedVehicleWholeModel);
   selectedVehicleWholeYear = document.getElementById('vehicle-whole-year-filter').value;
@@ -801,6 +844,7 @@ async function renderVehicleWhole() {
   const params = new URLSearchParams({ category: vehicleCategory, listing_type: 'whole', make: vehicleContext.make, country: browsingCountry });
   if (selectedVehicleWholeModel) params.set('model', selectedVehicleWholeModel);
   if (selectedVehicleWholeYear) params.set('year', selectedVehicleWholeYear);
+  if (selectedVehicleCity) params.set('city', selectedVehicleCity);
 
   const el = document.getElementById('vehicle-whole-listings');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>جارِ التحميل...</div>';
