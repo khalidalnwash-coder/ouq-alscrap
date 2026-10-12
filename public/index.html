@@ -374,6 +374,7 @@
   <div class="screen" id="screen-search">
     <div class="topbar"><span class="back" onclick="go('home')"><i data-lucide="chevron-right" class="icon"></i></span><h2>قطع الغيار</h2></div>
     <select id="search-country" onchange="onBrowsingCountryChange(this.value)" style="margin-bottom:14px;"></select>
+    <select id="search-city" onchange="onSearchCityChange()" style="margin-bottom:14px;"></select>
     <div class="searchbar"><i data-lucide="search" class="icon"></i><input id="search-q" placeholder="ابحث في قطع الغيار" oninput="debouncedSearch()"></div>
     <select id="search-year-filter" onchange="renderSearch()" style="margin-bottom:12px;"></select>
     <div class="cat-strip" id="cat-strip"></div>
@@ -403,6 +404,8 @@
        the content below in place — no back-navigation between them. -->
   <div class="screen" id="screen-vehicle-browse">
     <div class="topbar"><span class="back" onclick="go('vehicle-makes')"><i data-lucide="chevron-right" class="icon"></i></span><h2 id="vehicle-browse-title">دراجات</h2></div>
+
+    <select id="vehicle-city-filter" onchange="onVehicleCityChange()" style="margin-bottom:14px;"></select>
 
     <div class="tab-bar">
       <div class="tab-btn" id="vtab-btn-part" onclick="switchVehicleTab('part')">قطع غيار</div>
