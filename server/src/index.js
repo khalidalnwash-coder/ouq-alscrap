@@ -24,6 +24,16 @@ app.use(express.json());
 // refuses to write anything new. Only unset when Cloudinary is genuinely
 // active, since media is then served directly from Cloudinary's own URLs.
 if (uploadsDir) app.use('/uploads', express.static(uploadsDir));
+
+// Served explicitly (ahead of the static middleware below, and with an
+// explicit no-cache header) so browsers always revalidate it instead of
+// possibly reusing a stale cached copy — the one file that genuinely must
+// never go stale, since it's what detects and installs every app update.
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '..', '..', 'public', 'sw.js'));
+});
+
 app.use(express.static(path.join(__dirname, '..', '..', 'public')));
 
 app.use('/api/auth', authRoutes);

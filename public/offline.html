@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لا يوجد اتصال بالإنترنت — سوق السكراب</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<style>
+  :root{
+    --blue:#1E3A5F; --blue-light:#EAF0F6; --bg:#F3F5F8; --card:#FFFFFF;
+    --text:#13202E; --text-secondary:#5B6B7C; --border:#E3E8EE; --radius-lg:18px; --radius-sm:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --blue:#3D7FE0; --blue-light:#1A3450; --bg:#0B1624; --card:#132235; --text:#EAF0F6; --text-secondary:#8FA3B8; --border:#213346; }
+  }
+  :root[data-theme="light"]{ --blue:#1E3A5F; --blue-light:#EAF0F6; --bg:#F3F5F8; --card:#FFFFFF; --text:#13202E; --text-secondary:#5B6B7C; --border:#E3E8EE; }
+  :root[data-theme="dark"]{ --blue:#3D7FE0; --blue-light:#1A3450; --bg:#0B1624; --card:#132235; --text:#EAF0F6; --text-secondary:#8FA3B8; --border:#213346; }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans Arabic','Tahoma','Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    width:100%; max-width:380px; margin:20px; text-align:center;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg);
+    padding:34px 26px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+  }
+  .icon-circle{
+    width:72px; height:72px; border-radius:50%; background:var(--blue-light); color:var(--blue);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 20px;
+  }
+  h1{ font-size:19px; font-weight:700; margin:0 0 8px; }
+  p{ font-size:14px; color:var(--text-secondary); line-height:1.7; margin:0 0 24px; }
+  button{
+    width:100%; background:var(--blue); color:#fff; border:none; border-radius:var(--radius-sm);
+    padding:13px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+    </div>
+    <h1>لا يوجد اتصال بالإنترنت</h1>
+    <p>تأكد من اتصالك بالإنترنت وحاول مرة أخرى. أي صفحة فتحتها قبل انقطاع الاتصال قد تبقى متاحة.</p>
+    <button onclick="location.reload()">إعادة المحاولة</button>
+  </div>
+  <script>
+    // Match whatever theme the user already picked in the app (same
+    // localStorage key as app.js), falling back to system preference —
+    // kept in sync here since this page is served standalone, outside app.js.
+    try {
+      var pref = localStorage.getItem('alscrap_theme');
+      if (pref === 'light' || pref === 'dark') document.documentElement.setAttribute('data-theme', pref);
+    } catch (e) { /* localStorage unavailable (private mode, etc.) — system preference still applies via prefers-color-scheme */ }
+  </script>
+</body>
+</html>

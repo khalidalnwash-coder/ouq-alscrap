@@ -67,6 +67,87 @@ if (darkMediaQuery) {
 }
 applyTheme();
 
+// ---------- PWA: service worker registration + auto-update ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      // Browsers only re-check an installed service worker for changes
+      // every so often on their own (roughly once a day) — asking directly
+      // whenever the app regains focus gets a waiting update noticed, and
+      // therefore installed, much sooner.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch(() => {});
+  });
+  // clients.claim() in sw.js means controllerchange also fires the very
+  // first time a worker ever activates for this page (no controller yet ->
+  // now controlled) — that's not an update, just the normal first install,
+  // and must NOT trigger a reload. Only a SECOND controllerchange (this
+  // page already had a controller, and a newer worker just replaced it) is
+  // a real update, and that's the one worth reloading for so the user
+  // actually runs the new code instead of being stuck on the old one.
+  let hadControllerOnLoad = !!navigator.serviceWorker.controller;
+  let reloadedForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadControllerOnLoad) {
+      hadControllerOnLoad = true;
+      return;
+    }
+    if (reloadedForUpdate) return;
+    reloadedForUpdate = true;
+    window.location.reload();
+  });
+}
+
+// ---------- PWA: "add to home screen" hint (iOS) / install banner (Android) ----------
+const PWA_HINT_DISMISSED_KEY = 'alscrap_pwa_hint_dismissed';
+let deferredInstallPrompt = null;
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS 13+ reports as a Mac
+}
+function isStandalonePwa() {
+  return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function showPwaHint(kind) {
+  if (localStorage.getItem(PWA_HINT_DISMISSED_KEY) || isStandalonePwa()) return;
+  document.getElementById('pwa-hint-icon-ios').style.display = kind === 'ios' ? '' : 'none';
+  document.getElementById('pwa-hint-icon-android').style.display = kind === 'android' ? '' : 'none';
+  document.getElementById('pwa-hint-install-btn').style.display = kind === 'android' ? '' : 'none';
+  document.getElementById('pwa-hint-text').textContent = kind === 'ios'
+    ? 'لإضافة سوق السكراب للشاشة الرئيسية: اضغط زر المشاركة، ثم "إضافة إلى الشاشة الرئيسية"'
+    : 'ثبّت سوق السكراب على جهازك لوصول أسرع';
+  document.getElementById('pwa-hint').style.display = 'flex';
+  document.getElementById('app').style.paddingTop = '54px';
+  refreshIcons();
+}
+function dismissPwaHint() {
+  localStorage.setItem(PWA_HINT_DISMISSED_KEY, '1');
+  document.getElementById('pwa-hint').style.display = 'none';
+  document.getElementById('app').style.paddingTop = '';
+}
+async function installPwa() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissPwaHint();
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showPwaHint('android');
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  dismissPwaHint();
+});
+if (isIosDevice() && !isStandalonePwa()) {
+  showPwaHint('ios');
+}
+
 // ---------- api helper ----------
 async function api(path, { method = 'GET', body, isForm = false } = {}) {
   const headers = {};
@@ -665,6 +746,10 @@ function escapeHtml(s) {
 }
 
 // ---------- home ----------
+function widenHomeToAllCountries() {
+  setBrowsingCountry('');
+  renderHome();
+}
 async function renderHome() {
   document.getElementById('home-country').value = browsingCountry;
   const el = document.getElementById('home-listings');
@@ -673,7 +758,7 @@ async function renderHome() {
     const { listings } = await api('/listings?country=' + encodeURIComponent(browsingCountry));
     el.innerHTML = listings.length
       ? listings.slice(0, 6).map(listingCard).join('')
-      : '<p class="muted" style="grid-column:1/-1;">لا توجد إعلانات بعد</p>';
+      : noResultsHtml(false, !!browsingCountry, '', 'widenHomeToAllCountries()', 'لا توجد إعلانات بعد');
     refreshIcons();
   } catch (err) {
     el.innerHTML = `<p class="muted" style="grid-column:1/-1;">تعذّر تحميل الإعلانات</p>`;

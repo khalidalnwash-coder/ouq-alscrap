@@ -228,6 +228,21 @@ button:active{ transform:translateY(1px); }
 }
 .fab .icon{ width:20px; height:20px; }
 
+.pwa-hint{
+  position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:440px;
+  background:var(--blue-dark); color:#fff; display:flex; align-items:center; gap:10px;
+  padding:11px 14px; z-index:70; box-shadow:0 2px 10px rgba(0,0,0,.12);
+}
+.pwa-hint-icon{ flex-shrink:0; display:flex; }
+.pwa-hint-icon .icon{ color:#fff; }
+.pwa-hint-text{ flex:1; font-size:var(--fs-xs); line-height:1.5; margin:0; color:#fff; }
+.pwa-hint-install-btn{
+  flex-shrink:0; background:#fff; color:var(--blue-dark); border:none; border-radius:var(--radius-sm);
+  padding:7px 12px; font-size:var(--fs-xs); font-weight:700; cursor:pointer; font-family:inherit;
+}
+.pwa-hint-close{ flex-shrink:0; cursor:pointer; display:flex; opacity:.85; }
+.pwa-hint-close .icon{ color:#fff; width:16px; height:16px; }
+
 .avatar{
   width:40px; height:40px; border-radius:50%; background:var(--blue-light); color:var(--blue);
   display:flex; align-items:center; justify-content:center; font-size:var(--fs-sm); font-weight:700; flex-shrink:0;
