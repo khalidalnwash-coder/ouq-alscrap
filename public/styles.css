@@ -227,6 +227,7 @@ button:active{ transform:translateY(1px); }
   box-shadow:var(--shadow-lg); cursor:pointer;
 }
 .fab .icon{ width:20px; height:20px; }
+.fab-label{ display:none; } /* shown as real text next to the icon only in the ≥1024px sidebar nav */
 
 .pwa-hint{
   position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:440px;
@@ -315,6 +316,10 @@ button:active{ transform:translateY(1px); }
 .msg-theirs{ align-self:flex-start; background:var(--card); border:1px solid var(--border); border-bottom-left-radius:4px; }
 .msg-mine{ align-self:flex-end; background:var(--blue); color:#fff; border-bottom-right-radius:4px; }
 .msg-time{ display:block; font-size:9.5px; margin-top:4px; opacity:.65; text-align:left; }
+.chat-input-bar{
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:440px;
+  background:var(--card); border-top:1px solid var(--border); padding:10px 16px; display:flex; gap:8px; z-index:60;
+}
 
 /* Segmented tab switcher — vehicle-section screens ("قطع غيار" | "[نوع] كاملة"),
    one tap to swap content in place, no intermediate choice screen or back-nav. */
@@ -328,3 +333,88 @@ button:active{ transform:translateY(1px); }
   transition:all .15s ease; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .tab-btn.active{ background:var(--card); color:var(--blue); box-shadow:var(--shadow-sm); }
+
+/* =====================================================================
+   RESPONSIVE: tablet (≥768px) and laptop/desktop (≥1024px, ≥1440px).
+   Nothing above this point is touched by these rules — mobile (<768px)
+   keeps the exact layout it always had. Works in portrait and landscape
+   (these are plain width breakpoints, not orientation-specific), and in
+   standalone/installed PWA mode exactly as in a regular browser tab,
+   since display:standalone doesn't change viewport/CSS behavior at all.
+   ===================================================================== */
+
+/* ---------- Tablet: iPad portrait and up ---------- */
+@media (min-width: 768px){
+  :root{
+    --fs-xs:12px; --fs-sm:13.5px; --fs-base:15px; --fs-md:16.5px; --fs-lg:20px; --fs-xl:25px; --fs-2xl:29px;
+  }
+  #app{ max-width:720px; }
+  .screen{ padding:24px 28px; }
+  .card{ padding:24px; }
+  .btn-primary, .btn-outline{ padding:14px; }
+  input, select, textarea{ padding:13px 15px; }
+  .listing-grid{ grid-template-columns:repeat(3, 1fr); gap:14px; }
+  .listing-thumb{ height:130px; }
+  /* #screen-home .cat-grid (the 3 vehicle-section cards) stays 3-wide
+     regardless, via its own higher-specificity ID rule above. */
+  .cat-grid{ grid-template-columns:repeat(3, 1fr); }
+  .navbar, .pwa-hint, .chat-input-bar{ max-width:720px; }
+}
+
+/* ---------- Laptop / desktop: ≥1024px ---------- */
+@media (min-width: 1024px){
+  #app{
+    max-width:1140px; display:flex; flex-direction:row; padding-bottom:0; min-height:100vh;
+  }
+  .screen{ flex:1; min-width:0; padding:32px 40px; }
+  .listing-grid{ grid-template-columns:repeat(4, 1fr); }
+  .listing-thumb{ height:148px; }
+  .cat-grid{ grid-template-columns:repeat(4, 1fr); }
+
+  /* Bottom tab bar becomes a sticky vertical rail. order:-1 puts it first
+     among #app's flex children despite coming later in the DOM (it's
+     after every .screen there) — in this RTL page that places it on the
+     right (the "start" edge), with the active screen's content to its
+     left, without reordering any markup. */
+  .navbar{
+    position:sticky; top:0; order:-1; align-self:flex-start;
+    bottom:auto; left:auto; transform:none; max-width:none;
+    flex-direction:column; justify-content:flex-start; align-items:stretch;
+    width:220px; flex-shrink:0; height:100vh; gap:4px; padding:24px 16px;
+    box-shadow:none; border-top:none; border-left:1px solid var(--border);
+  }
+  .navbar .nav-item{
+    flex-direction:row; justify-content:flex-start; gap:12px; padding:11px 14px;
+    border-radius:var(--radius-sm); text-align:start; transition:background .15s ease;
+  }
+  .navbar .nav-item:hover{ background:var(--blue-light); }
+  .navbar .nav-item.active{ background:var(--blue-light); }
+  .navbar .nav-item .icon{ width:19px; height:19px; }
+  .navbar .nav-item span{ font-size:var(--fs-sm); }
+  .fab{
+    order:-1; margin-top:0; margin-bottom:10px; width:auto; height:auto; border:none;
+    border-radius:var(--radius-sm); flex-direction:row; justify-content:flex-start;
+    gap:12px; padding:12px 14px;
+  }
+  .fab-label{ display:inline; font-size:var(--fs-sm); font-weight:600; }
+
+  .pwa-hint{ max-width:1140px; }
+  .chat-input-bar{ position:sticky; bottom:0; left:auto; transform:none; max-width:none; }
+
+  /* Listing detail: media on one side, everything else on the other.
+     Grid (not flex) because .detail-info-col appears twice in the markup
+     (its exact original positions either side of the media block, kept
+     that way so mobile's DOM/visual order is untouched) — grid-column
+     placement stacks both fragments in column 1 regardless of how many
+     there are, while the single media fragment spans every row of column 2. */
+  #detail-body{
+    display:grid; grid-template-columns:1fr 42%; gap:28px; align-items:start; padding:28px;
+  }
+  .detail-info-col{ grid-column:1; }
+  .detail-media-col{ grid-column:2; grid-row:1 / -1; position:sticky; top:20px; }
+}
+
+@media (min-width: 1440px){
+  .listing-grid{ grid-template-columns:repeat(5, 1fr); }
+  #app{ max-width:1320px; }
+}

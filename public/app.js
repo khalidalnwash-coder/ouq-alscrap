@@ -1095,7 +1095,14 @@ async function openDetail(id) {
         <button class="btn-ghost" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px; flex-shrink:0;" title="إبلاغ عن الإعلان" onclick="openReportListing()">${icon('flag', 'icon-sm')}</button>
       </div>`;
 
+    // Two reusable column classes (detail-info-col appears twice, in its
+    // exact original positions either side of the media block) — on mobile
+    // #detail-body stays display:block, so this wrapping changes nothing
+    // visually there; only the ≥1024px CSS Grid rule (styles.css) places
+    // every .detail-info-col into one column and .detail-media-col into the
+    // other, for the side-by-side layout on tablets/laptops.
     body.innerHTML = `
+      <div class="detail-info-col">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
         <h3 style="font-size:var(--fs-md); font-weight:700;">${escapeHtml(listing.title)}</h3>
         ${topBadge}
@@ -1114,10 +1121,14 @@ async function openDetail(id) {
       </div>
 
       ${listing.description ? `<p style="font-size:var(--fs-base); line-height:1.7; margin-bottom:14px;">${escapeHtml(listing.description)}</p>` : ''}
+      </div>
 
+      <div class="detail-media-col">
       ${renderDetailMedia(listing.media)}
       <div style="margin-bottom:6px;"></div>
+      </div>
 
+      <div class="detail-info-col">
       ${contactRow}
 
       <div style="background:var(--bg); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
@@ -1126,6 +1137,7 @@ async function openDetail(id) {
       </div>
 
       <button class="btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;" onclick="openDealConfirm()">${icon('handshake', 'icon-sm')} تأكيد الصفقة وتسديد حصتك من العمولة</button>
+      </div>
     `;
     refreshIcons();
     renderComments();
