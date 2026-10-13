@@ -308,3 +308,29 @@ CREATE TABLE IF NOT EXISTS support_messages (
 
 CREATE INDEX IF NOT EXISTS idx_support_messages_status_created ON support_messages (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_messages_user ON support_messages (user_id, created_at DESC);
+
+-- Brute-force protection (security review follow-up). Two independent
+-- throttles share these columns across every OTP flow (signup, resend,
+-- forgot-password, profile phone/email change) since they all reuse the
+-- same otp_code/otp_expires_at columns already:
+--   - "guessing" the current code: otp_attempt_count counts wrong tries
+--     against whatever otp_code is live right now; 5 wrong tries sets
+--     otp_locked_until (verification refused until it passes, regardless
+--     of whether the code itself would've matched). Issuing a fresh code
+--     resets the attempt counter to 0 for that new code.
+--   - "requesting" new codes: otp_send_count/otp_window_started_at form a
+--     1-hour sliding window (reset once now() passes window start + 1h)
+--     capping how many codes one account can have issued/resent, so an
+--     attacker can't just keep resetting otp_attempt_count by spamming
+--     resend — the resend itself is capped at 5/hour, which bounds total
+--     guesses/hour at attempts-per-code × sends-per-hour either way.
+-- Login has its own separate pair (failed_login_count/login_locked_until)
+-- since it's a different secret (the password) with its own 5-try/15-min
+-- lockout, independent of whatever is happening with OTP at the same time.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_locked_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_send_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_window_started_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_last_sent_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS login_locked_until TIMESTAMPTZ;

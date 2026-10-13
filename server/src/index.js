@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
@@ -14,8 +15,58 @@ const supportRoutes = require('./routes/support');
 const { uploadsDir, storageStatus } = require('./utils/storage');
 const { runArchivalSweep } = require('./jobs/archival');
 
+function envTrim(name) {
+  const v = process.env[name];
+  if (v == null) return undefined;
+  const t = v.trim();
+  return t === '' ? undefined : t;
+}
+
 const app = express();
-app.use(cors());
+
+// Render (and most PaaS hosts) sit the app behind exactly one reverse
+// proxy — trusting just that first hop (not `true`, which would trust any
+// X-Forwarded-For an attacker sends directly) is what makes req.ip reflect
+// the real client, which both the IP-based rate limiters below and any
+// future logging depend on.
+app.set('trust proxy', 1);
+
+// Security headers (security review item 3). CSP is left off: this app's
+// screens are built with inline onclick="" handlers throughout
+// public/app.js, which a real Content-Security-Policy would block wholesale
+// without a broader refactor to addEventListener() — tracked as a deferred
+// follow-up rather than silently breaking every button. Every other
+// protection helmet sets by default (nosniff, frameguard, hidePoweredBy,
+// HSTS, referrer-policy, etc.) stays on.
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS: restricted to the app's own origin(s) (security review item 3) —
+// previously wide open to any site (Access-Control-Allow-Origin: *).
+// This app serves its own frontend (public/ below) from the same origin as
+// the API, so the one origin that must always work with zero configuration
+// is the app's own — computed per-request from the Host header (and
+// req.protocol, which correctly reflects https behind Render's proxy now
+// that trust proxy is set above) rather than hardcoded, so this isn't
+// something a deploy can forget to set. ALLOWED_ORIGINS (comma-separated,
+// see server/.env.example) is only for genuinely separate origins — a
+// different frontend domain, a mobile app webview, etc. A request with no
+// Origin header at all (curl, server-to-server) is never affected by CORS
+// in the first place; this only governs cross-origin browser requests.
+const configuredOrigins = (envTrim('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const isProduction = envTrim('NODE_ENV') === 'production';
+app.use(
+  cors((req, callback) => {
+    const origin = req.headers.origin;
+    const selfOrigin = `${req.protocol}://${req.headers.host}`;
+    const allowed =
+      !origin ||
+      origin === selfOrigin ||
+      configuredOrigins.includes(origin) ||
+      (!isProduction && /^https?:\/\/localhost(:\d+)?$/.test(origin));
+    callback(null, { origin: allowed });
+  })
+);
+
 app.use(express.json());
 
 // uploadsDir is set whenever local disk is involved at all — the real
@@ -50,13 +101,24 @@ app.use('/api/support', supportRoutes);
 // really active without digging through Render's logs. See utils/storage.js.
 app.get('/api/health', (_req, res) => res.json({ ok: true, storage: storageStatus }));
 
+// Every error is logged with full detail server-side; only a small,
+// deliberately generic set of messages ever reaches the client (security
+// review item 3 — raw driver/parser errors, e.g. Postgres's own error text,
+// used to be forwarded verbatim via err.message).
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error(err);
+
   if (err instanceof Error && err.message && err.message.includes('File too large')) {
     return res.status(413).json({ error: 'حجم الملف كبير جداً' });
   }
-  res.status(500).json({ error: err.message || 'خطأ في الخادم' });
+  // express.json() throws a SyntaxError (via body-parser) for a malformed
+  // request body — a client mistake, not a server fault, so 400 rather than 500.
+  if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    return res.status(400).json({ error: 'البيانات المرسلة غير صالحة' });
+  }
+
+  res.status(500).json({ error: 'حدث خطأ في الخادم، حاول مرة أخرى' });
 });
 
 const port = process.env.PORT || 4000;

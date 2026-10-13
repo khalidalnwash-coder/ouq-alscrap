@@ -3,6 +3,7 @@ const multer = require('multer');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { saveImage } = require('../utils/storage');
+const { detectFileType } = require('../utils/fileSignature');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { SUPPORT_ISSUE_TYPES } = require('../utils/constants');
 
@@ -37,6 +38,15 @@ router.post(
     }
     if (!description || !description.trim()) {
       return res.status(400).json({ error: 'اكتب وصف المشكلة' });
+    }
+
+    // Real content check (security review item 3) — the claimed Content-Type
+    // in fileFilter above is attacker-controlled, this checks actual bytes.
+    if (req.file) {
+      const detected = await detectFileType(req.file.buffer);
+      if (!detected || !IMAGE_MIME_TYPES.includes(detected.mime)) {
+        return res.status(400).json({ error: 'الصورة يجب أن تكون JPG أو PNG صالحة' });
+      }
     }
 
     let imageUrl = null;
