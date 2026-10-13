@@ -1,4 +1,4 @@
--- سوق السكراب — Phase 1 MVP schema
+-- تشليح الخليج — Phase 1 MVP schema
 -- Scope: single country (SA), single listing category (spare_part).
 -- Enums are kept general (per the full spec) so Phase 2 can widen scope
 -- without a schema rewrite; the API layer is what restricts Phase 1.

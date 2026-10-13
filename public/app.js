@@ -117,8 +117,8 @@ function showPwaHint(kind) {
   document.getElementById('pwa-hint-icon-android').style.display = kind === 'android' ? '' : 'none';
   document.getElementById('pwa-hint-install-btn').style.display = kind === 'android' ? '' : 'none';
   document.getElementById('pwa-hint-text').textContent = kind === 'ios'
-    ? 'لإضافة سوق السكراب للشاشة الرئيسية: اضغط زر المشاركة، ثم "إضافة إلى الشاشة الرئيسية"'
-    : 'ثبّت سوق السكراب على جهازك لوصول أسرع';
+    ? 'لإضافة تشليح الخليج للشاشة الرئيسية: اضغط زر المشاركة، ثم "إضافة إلى الشاشة الرئيسية"'
+    : 'ثبّت تشليح الخليج على جهازك لوصول أسرع';
   document.getElementById('pwa-hint').style.display = 'flex';
   document.getElementById('app').style.paddingTop = '54px';
   refreshIcons();
