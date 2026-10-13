@@ -1,4 +1,4 @@
-// Service worker for سوق السكراب — app-shell caching + offline fallback only.
+// Service worker for تشليح الخليج — app-shell caching + offline fallback only.
 // Never caches /api/* (live marketplace data) or /uploads/* (user media) —
 // those always go straight to the network, untouched by this file.
 //
