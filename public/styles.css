@@ -125,15 +125,10 @@ button:active{ transform:translateY(1px); }
 .logo-icon{
   width:68px; height:68px; border-radius:var(--radius-lg); background:var(--blue);
   display:flex; align-items:center; justify-content:center; margin:0 auto 16px;
-  box-shadow:var(--shadow-md); position:relative; color:#fff;
+  box-shadow:var(--shadow-md); position:relative; color:#fff; overflow:hidden;
 }
 .logo-icon .icon{ width:32px; height:32px; }
-.logo-icon .logo-badge{
-  position:absolute; bottom:-6px; left:-6px; width:26px; height:26px; border-radius:50%;
-  background:var(--accent); display:flex; align-items:center; justify-content:center;
-  border:2.5px solid var(--bg); box-shadow:var(--shadow-sm);
-}
-.logo-icon .logo-badge .icon{ width:13px; height:13px; color:#fff; }
+.logo-icon .app-logo-img{ width:100%; height:100%; display:block; }
 
 .icon{ width:18px; height:18px; flex-shrink:0; stroke-width:2; }
 .icon-xs{ width:14px; height:14px; }
