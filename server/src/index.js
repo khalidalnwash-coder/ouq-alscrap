@@ -44,20 +44,37 @@ app.use(helmet({ contentSecurityPolicy: false }));
 // previously wide open to any site (Access-Control-Allow-Origin: *).
 // This app serves its own frontend (public/ below) from the same origin as
 // the API, so the one origin that must always work with zero configuration
-// is the app's own — computed per-request from the Host header (and
-// req.protocol, which correctly reflects https behind Render's proxy now
-// that trust proxy is set above) rather than hardcoded, so this isn't
-// something a deploy can forget to set. ALLOWED_ORIGINS (comma-separated,
-// see server/.env.example) is only for genuinely separate origins — a
-// different frontend domain, a mobile app webview, etc. A request with no
-// Origin header at all (curl, server-to-server) is never affected by CORS
-// in the first place; this only governs cross-origin browser requests.
+// is the app's own — computed per-request from req.hostname/req.protocol
+// (both trust-proxy-aware, honoring X-Forwarded-Host/-Proto from the one
+// trusted hop set above) rather than hardcoded, so this isn't something a
+// deploy can forget to set.
+//
+// BUG FIXED HERE: the first version of this check used the raw `Host`
+// header instead of req.hostname. Render's routing layer can forward a
+// request to this container under a Host that differs from the public
+// domain the browser actually sees (that's exactly what X-Forwarded-Host
+// is for) — so the raw-Host comparison never matched the browser's real
+// Origin in production, and CORS silently blocked the browser from reading
+// every authenticated response (GET /api/auth/me included) even though the
+// request reached the server and succeeded there; the browser just refused
+// to hand the response to the page's JS. req.hostname is Express's
+// proxy-aware accessor (uses X-Forwarded-Host under trust proxy, falls
+// back to Host otherwise) and doesn't include a port, which is also
+// correct here since a production Origin never carries one either; local
+// dev (http://localhost:4000, port included) is covered by the explicit
+// localhost fallback below instead.
+//
+// ALLOWED_ORIGINS (comma-separated, see server/.env.example) is only for
+// genuinely separate origins — a different frontend domain, a mobile app
+// webview, etc. A request with no Origin header at all (curl,
+// server-to-server) is never affected by CORS in the first place; this
+// only governs cross-origin browser requests.
 const configuredOrigins = (envTrim('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const isProduction = envTrim('NODE_ENV') === 'production';
 app.use(
   cors((req, callback) => {
     const origin = req.headers.origin;
-    const selfOrigin = `${req.protocol}://${req.headers.host}`;
+    const selfOrigin = `${req.protocol}://${req.hostname}`;
     const allowed =
       !origin ||
       origin === selfOrigin ||
