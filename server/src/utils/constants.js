@@ -295,6 +295,20 @@ const BANK_ACCOUNT = {
 };
 
 // ---------------------------------------------------------------------------
+// Official contact details (confirmed by product owner) — the single source
+// of truth for the app's email/phone/WhatsApp, served to the client via
+// GET /api/listings/meta (meta.contact) and used everywhere they appear
+// (support screen, privacy policy) so changing them means editing here only.
+// whatsapp_digits is the number in the plain international-digits form
+// wa.me deep links require (no "+", no spaces); phone_display is the
+// human-readable form shown in the UI.
+const CONTACT = {
+  email: 'tashleehaleej@gmail.com',
+  phone_display: '+966553205206',
+  whatsapp_digits: '966553205206',
+};
+
+// ---------------------------------------------------------------------------
 // Auto-archival policy (spec Section 15), driven by listings.last_updated_at.
 const ARCHIVE_WARNING_DAYS = 45; // day 45: push the "update within 15 days" reminder
 const ARCHIVE_DAYS = 60; // day 60: hide from search, flip to status='archived'
@@ -324,6 +338,7 @@ module.exports = {
   SUPPORT_ISSUE_TYPES,
   COMMISSION_RATE,
   BANK_ACCOUNT,
+  CONTACT,
   ARCHIVE_WARNING_DAYS,
   ARCHIVE_DAYS,
   HARD_DELETE_DAYS_AFTER_ARCHIVE,

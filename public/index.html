@@ -338,11 +338,11 @@
       <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85; margin-bottom:10px;">لأي استفسار أو طلب يخص بياناتك الشخصية أو هذه السياسة، تواصل معنا عبر:</p>
       <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
         <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
-        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني المختص بحماية البيانات</p><p style="font-weight:700; font-size:var(--fs-base); color:var(--warning);">[يُستكمل لاحقاً: البريد الرسمي لمسؤول حماية البيانات]</p></div>
+        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني المختص بحماية البيانات</p><p style="font-weight:700; font-size:var(--fs-base);" id="privacy-dpo-email"></p></div>
       </div>
       <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
         <i data-lucide="headphones" class="icon icon-lg icon-muted"></i>
-        <div><p class="muted" style="font-size:var(--fs-xs);">الدعم الفني العام</p><p style="font-weight:700; font-size:var(--fs-base);">support@tashleehalkhaleej.com</p></div>
+        <div><p class="muted" style="font-size:var(--fs-xs);">الدعم الفني العام</p><p style="font-weight:700; font-size:var(--fs-base);" id="privacy-support-email"></p></div>
       </div>
       <p style="font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.85;">الجهة المشغّلة للمنصة: <span style="color:var(--warning); font-weight:700;">[يُستكمل لاحقاً: الاسم النظامي الكامل للجهة/السجل التجاري]</span></p>
     </div>
@@ -827,11 +827,15 @@
       <p class="muted" style="margin-bottom:22px;">عندك مشكلة أو استفسار؟ فريق الدعم جاهز يساعدك</p>
       <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:10px; text-align:right;">
         <i data-lucide="message-circle" class="icon icon-lg" style="color:var(--blue);"></i>
-        <div><p class="muted" style="font-size:var(--fs-xs);">واتساب</p><p style="font-weight:700; font-size:var(--fs-base);">966XXXXXXXXX+</p></div>
+        <div><p class="muted" style="font-size:var(--fs-xs);">واتساب</p><p style="font-weight:700; font-size:var(--fs-base);" id="support-whatsapp-display"></p></div>
       </div>
       <div style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius-sm); padding:15px; margin-bottom:18px; text-align:right;">
         <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
-        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني</p><p style="font-weight:700; font-size:var(--fs-base);">support@tashleehalkhaleej.com</p></div>
+        <div><p class="muted" style="font-size:var(--fs-xs);">البريد الإلكتروني</p><p style="font-weight:700; font-size:var(--fs-base);" id="support-email-display"></p></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:18px;">
+        <a id="support-whatsapp-btn" href="#" target="_blank" rel="noopener" class="btn-outline" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none;"><i data-lucide="message-circle" class="icon icon-sm"></i> تواصل معنا بالواتساب</a>
+        <a id="support-email-btn" href="#" class="btn-outline" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none;"><i data-lucide="mail" class="icon icon-sm"></i> راسلنا بالإيميل</a>
       </div>
       <p class="muted">أوقات الرد: يومياً 9ص - 9م</p>
     </div>

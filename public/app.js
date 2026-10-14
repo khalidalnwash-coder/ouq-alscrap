@@ -6,7 +6,7 @@ let chosenOtpMethod = 'whatsapp';
 let chosenFpMethod = 'whatsapp';
 let fpUserId = null;
 let currentUser = null;
-let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null };
+let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null, contact: null };
 const COUNTRY_KEY = 'alscrap_country';
 // '' means "كل الدول" (browsing/searching across every GCC country) — an
 // explicit, intentional choice, so a stored '' must NOT fall back to 'SA'
@@ -255,7 +255,7 @@ async function bootstrap() {
   try {
     meta = await api('/listings/meta');
   } catch {
-    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null };
+    meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null, contact: null };
   }
   populateMetaSelects();
 
@@ -397,6 +397,31 @@ function populateMetaSelects() {
 
   const partCat = document.getElementById('cl-part-category');
   partCat.innerHTML = meta.part_categories.map((c) => `<option>${c}</option>`).join('');
+
+  populateContactInfo();
+}
+
+// Official email/WhatsApp number — single source of truth is CONTACT in
+// server/src/utils/constants.js (served via meta.contact); every place that
+// shows or links to them (support screen, privacy policy) reads from here
+// instead of hardcoding the values, so changing them means editing one place.
+function populateContactInfo() {
+  const c = meta.contact;
+  if (!c) return;
+
+  const supportEmailDisplay = document.getElementById('support-email-display');
+  if (supportEmailDisplay) supportEmailDisplay.textContent = c.email;
+  const supportWhatsappDisplay = document.getElementById('support-whatsapp-display');
+  if (supportWhatsappDisplay) supportWhatsappDisplay.textContent = c.phone_display;
+  const supportWhatsappBtn = document.getElementById('support-whatsapp-btn');
+  if (supportWhatsappBtn) supportWhatsappBtn.href = `https://wa.me/${c.whatsapp_digits}`;
+  const supportEmailBtn = document.getElementById('support-email-btn');
+  if (supportEmailBtn) supportEmailBtn.href = `mailto:${c.email}`;
+
+  const privacyDpoEmail = document.getElementById('privacy-dpo-email');
+  if (privacyDpoEmail) privacyDpoEmail.textContent = c.email;
+  const privacySupportEmail = document.getElementById('privacy-support-email');
+  if (privacySupportEmail) privacySupportEmail.textContent = c.email;
 }
 
 // ---------- signup flow ----------
