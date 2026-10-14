@@ -69,6 +69,18 @@ body{
   width:100%; max-width:440px; min-height:100vh;
   background:var(--bg); position:relative; padding-bottom:78px;
 }
+/* 100vh on iOS/iPadOS Safari measures the viewport with its toolbars
+   hidden (the tallest it can ever be), not what's actually visible —
+   #app could end up taller than the real screen, which pushed the
+   position:fixed bottom:0 .navbar below the visible area until the page
+   was scrolled all the way down. 100dvh (dynamic viewport height)
+   tracks the real visible viewport as Safari's toolbars show/hide;
+   browsers without it (older Safari, most non-WebKit browsers already
+   compute 100vh correctly) just keep the line above as a fallback,
+   since an unsupported value is ignored rather than applied as 0. */
+@supports (min-height: 100dvh){
+  #app{ min-height:100dvh; }
+}
 .screen{ display:none; padding:18px 16px; animation:fadeIn .22s ease; }
 .screen.active{ display:block; }
 @keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
