@@ -2,11 +2,19 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
-const { generateOtp, otpExpiry, sendOtpMock } = require('../utils/otp');
+const {
+  generateOtp,
+  otpExpiry,
+  sendOtp,
+  throttleAndRecordOtpSend,
+  checkOtpVerifyAllowed,
+  recordOtpFailure,
+} = require('../utils/otp');
 const { serializeUser } = require('../utils/serialize');
 const { COUNTRIES, COUNTRY_PHONE_CODE, COUNTRY_CITIES } = require('../utils/constants');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { deleteImage, deleteVideo } = require('../utils/storage');
+const { otpSendLimiter, otpVerifyLimiter, loginLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -17,6 +25,18 @@ const router = express.Router();
 // fixed country; see public/app.js's onEpCodeChange).
 const ALL_CITIES = new Set(Object.values(COUNTRY_CITIES).flat());
 
+// Login brute-force lockout (security review item 2) — independent of the
+// OTP throttles above since the password is a different secret.
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCK_MINUTES = 15;
+
+// Shared 429 response shape for every OTP-send/verify throttle below —
+// retry_after_seconds lets the client show a countdown instead of a flat
+// "try again" dead end.
+function tooManyRequests(res, { retryAfterSeconds, message }) {
+  return res.status(429).json({ error: message, retry_after_seconds: retryAfterSeconds });
+}
+
 const PLEDGE_TEXT =
   'أتعهد بالله، واستحضاراً لقول الله تعالى "وَقُل اعمَلوا فَسَيَرَى اللَّهُ عَمَلَكُم"، أن أكون أميناً في سعيي وأدفع عمولة التطبيق (2.5%) عند إتمام أي صفقة عن طريق المنصة، وإن لم أفعل فأتصدق بمثل هذا المبلغ';
 
@@ -24,6 +44,7 @@ router.get('/pledge-text', (_req, res) => res.json({ text: PLEDGE_TEXT }));
 
 router.post(
   '/signup',
+  otpSendLimiter,
   asyncHandler(async (req, res) => {
     const {
       full_name,
@@ -78,8 +99,8 @@ router.post(
     const result = await pool.query(
       `INSERT INTO users
         (full_name, account_type, phone_country_code, phone_number, email, password_hash, age, country, city,
-         pledge_accepted_at, otp_channel, otp_code, otp_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10,$11,$12)
+         pledge_accepted_at, otp_channel, otp_code, otp_expires_at, otp_send_count, otp_window_started_at, otp_last_sent_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10,$11,$12, 1, now(), now())
        RETURNING *`,
       [
         full_name,
@@ -99,15 +120,15 @@ router.post(
     const user = result.rows[0];
 
     const destination = otp_channel === 'whatsapp' ? `${phone_country_code}${phone_number}` : normalizedEmail;
-    sendOtpMock({ channel: otp_channel, destination, code });
+    await sendOtp({ channel: otp_channel, destination, code });
 
+    // The code itself is never returned here (security review item 1) — it's
+    // delivered via the real provider when configured (see server/.env.example),
+    // and always logged server-side only, never to the HTTP caller.
     res.status(201).json({
       user_id: user.id,
       otp_channel,
       otp_destination: destination,
-      // Phase-1 decision: OTP delivery is fully mocked, no real provider wired up yet.
-      // The code is returned here (and logged server-side) instead of being sent for real.
-      dev_otp_code: code,
     });
   })
 );
@@ -136,10 +157,22 @@ async function findUserByIdentifier(identifier) {
 
 router.post(
   '/otp/resend',
+  otpSendLimiter,
   asyncHandler(async (req, res) => {
     const { user_id } = req.body || {};
     const user = await findByUserId(user_id);
     if (!user) return res.status(404).json({ error: 'مستخدم غير موجود' });
+
+    const throttle = await throttleAndRecordOtpSend(user);
+    if (!throttle.allowed) {
+      return tooManyRequests(res, {
+        retryAfterSeconds: throttle.retryAfterSeconds,
+        message:
+          throttle.reason === 'window'
+            ? 'طلبت عدة رموز خلال وقت قصير، حاول لاحقاً'
+            : 'الرجاء الانتظار قليلاً قبل طلب رمز جديد',
+      });
+    }
 
     const code = generateOtp();
     await pool.query('UPDATE users SET otp_code=$1, otp_expires_at=$2 WHERE id=$3', [
@@ -148,20 +181,28 @@ router.post(
       user.id,
     ]);
     const destination = user.otp_channel === 'whatsapp' ? `${user.phone_country_code}${user.phone_number}` : user.email;
-    sendOtpMock({ channel: user.otp_channel, destination, code });
+    await sendOtp({ channel: user.otp_channel, destination, code });
 
-    res.json({ ok: true, dev_otp_code: code });
+    res.json({ ok: true, otp_destination: destination });
   })
 );
 
 router.post(
   '/otp/verify',
+  otpVerifyLimiter,
   asyncHandler(async (req, res) => {
     const { user_id, code } = req.body || {};
     const user = await findByUserId(user_id);
     if (!user) return res.status(404).json({ error: 'مستخدم غير موجود' });
     if (user.verified_at) return res.status(400).json({ error: 'الحساب مفعّل مسبقاً' });
+
+    const lock = checkOtpVerifyAllowed(user);
+    if (!lock.allowed) {
+      return tooManyRequests(res, { retryAfterSeconds: lock.retryAfterSeconds, message: 'محاولات كثيرة خاطئة، حاول لاحقاً أو اطلب رمزاً جديداً' });
+    }
+
     if (!user.otp_code || user.otp_code !== code) {
+      await recordOtpFailure(user.id, user.otp_attempt_count);
       return res.status(400).json({ error: 'كود التحقق غير صحيح' });
     }
     if (new Date(user.otp_expires_at) < new Date()) {
@@ -170,7 +211,7 @@ router.post(
 
     const result = await pool.query(
       `UPDATE users SET verified_at = now(), otp_verified_channel = otp_channel,
-         otp_code = NULL, otp_expires_at = NULL
+         otp_code = NULL, otp_expires_at = NULL, otp_attempt_count = 0, otp_locked_until = NULL
        WHERE id = $1 RETURNING *`,
       [user.id]
     );
@@ -258,6 +299,7 @@ router.patch(
 router.post(
   '/profile/verify-request',
   requireAuth,
+  otpSendLimiter,
   asyncHandler(async (req, res) => {
     const { phone_country_code, phone_number, email, otp_channel } = req.body || {};
     if (!phone_number && !email) {
@@ -283,6 +325,18 @@ router.post(
       if (existing.rows[0]) return res.status(409).json({ error: 'هذا البريد الإلكتروني مستخدم بالفعل' });
     }
 
+    const user = await findByUserId(req.userId);
+    const throttle = await throttleAndRecordOtpSend(user);
+    if (!throttle.allowed) {
+      return tooManyRequests(res, {
+        retryAfterSeconds: throttle.retryAfterSeconds,
+        message:
+          throttle.reason === 'window'
+            ? 'طلبت عدة رموز خلال وقت قصير، حاول لاحقاً'
+            : 'الرجاء الانتظار قليلاً قبل طلب رمز جديد',
+      });
+    }
+
     const code = generateOtp();
     await pool.query(
       `UPDATE users SET otp_code=$1, otp_expires_at=$2, otp_channel=$3,
@@ -291,16 +345,15 @@ router.post(
       [code, otpExpiry(), otp_channel, phone_number ? phone_country_code : null, phone_number || null, normalizedEmail, req.userId]
     );
 
-    const user = await findByUserId(req.userId);
     const destination =
       otp_channel === 'whatsapp'
         ? phone_number
           ? `${phone_country_code}${phone_number}`
           : `${user.phone_country_code}${user.phone_number}`
         : normalizedEmail || user.email;
-    sendOtpMock({ channel: otp_channel, destination, code });
+    await sendOtp({ channel: otp_channel, destination, code });
 
-    res.json({ otp_destination: destination, dev_otp_code: code });
+    res.json({ otp_destination: destination });
   })
 );
 
@@ -309,10 +362,18 @@ router.post(
 router.post(
   '/profile/verify-confirm',
   requireAuth,
+  otpVerifyLimiter,
   asyncHandler(async (req, res) => {
     const { code } = req.body || {};
     const user = await findByUserId(req.userId);
+
+    const lock = checkOtpVerifyAllowed(user);
+    if (!lock.allowed) {
+      return tooManyRequests(res, { retryAfterSeconds: lock.retryAfterSeconds, message: 'محاولات كثيرة خاطئة، حاول لاحقاً أو اطلب رمزاً جديداً' });
+    }
+
     if (!user.otp_code || user.otp_code !== code) {
+      await recordOtpFailure(user.id, user.otp_attempt_count);
       return res.status(400).json({ error: 'كود التحقق غير صحيح' });
     }
     if (new Date(user.otp_expires_at) < new Date()) {
@@ -325,6 +386,8 @@ router.post(
     const updates = [
       'otp_code = NULL',
       'otp_expires_at = NULL',
+      'otp_attempt_count = 0',
+      'otp_locked_until = NULL',
       'pending_phone_country_code = NULL',
       'pending_phone_number = NULL',
       'pending_email = NULL',
@@ -370,6 +433,7 @@ router.post(
 
 router.post(
   '/login',
+  loginLimiter,
   asyncHandler(async (req, res) => {
     const { identifier, password } = req.body || {};
     if (!identifier || !password) {
@@ -380,8 +444,28 @@ router.post(
     if (user.status === 'suspended') return res.status(403).json({ error: 'الحساب موقوف' });
     if (!user.verified_at) return res.status(403).json({ error: 'الحساب غير مفعّل بعد' });
 
+    if (user.login_locked_until && new Date(user.login_locked_until) > new Date()) {
+      const retryAfterSeconds = Math.ceil((new Date(user.login_locked_until).getTime() - Date.now()) / 1000);
+      return tooManyRequests(res, { retryAfterSeconds, message: 'محاولات دخول خاطئة كثيرة، حاول لاحقاً' });
+    }
+
     const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
+    if (!ok) {
+      const next = (user.failed_login_count || 0) + 1;
+      if (next >= LOGIN_MAX_ATTEMPTS) {
+        await pool.query(
+          `UPDATE users SET failed_login_count = $1, login_locked_until = now() + interval '${LOGIN_LOCK_MINUTES} minutes' WHERE id = $2`,
+          [next, user.id]
+        );
+      } else {
+        await pool.query('UPDATE users SET failed_login_count = $1 WHERE id = $2', [next, user.id]);
+      }
+      return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
+    }
+
+    if (user.failed_login_count > 0 || user.login_locked_until) {
+      await pool.query('UPDATE users SET failed_login_count = 0, login_locked_until = NULL WHERE id = $1', [user.id]);
+    }
 
     const token = signToken(user);
     res.json({ token, user: serializeUser(user) });
@@ -390,6 +474,7 @@ router.post(
 
 router.post(
   '/forgot-password/request',
+  otpSendLimiter,
   asyncHandler(async (req, res) => {
     const { identifier, otp_channel } = req.body || {};
     if (!['whatsapp', 'email'].includes(otp_channel)) {
@@ -397,6 +482,17 @@ router.post(
     }
     const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(404).json({ error: 'لا يوجد حساب بهذا البريد/الجوال' });
+
+    const throttle = await throttleAndRecordOtpSend(user);
+    if (!throttle.allowed) {
+      return tooManyRequests(res, {
+        retryAfterSeconds: throttle.retryAfterSeconds,
+        message:
+          throttle.reason === 'window'
+            ? 'طلبت عدة رموز خلال وقت قصير، حاول لاحقاً'
+            : 'الرجاء الانتظار قليلاً قبل طلب رمز جديد',
+      });
+    }
 
     const code = generateOtp();
     await pool.query('UPDATE users SET otp_code=$1, otp_expires_at=$2, otp_channel=$3 WHERE id=$4', [
@@ -406,14 +502,15 @@ router.post(
       user.id,
     ]);
     const destination = otp_channel === 'whatsapp' ? `${user.phone_country_code}${user.phone_number}` : user.email;
-    sendOtpMock({ channel: otp_channel, destination, code });
+    await sendOtp({ channel: otp_channel, destination, code });
 
-    res.json({ user_id: user.id, dev_otp_code: code, otp_destination: destination });
+    res.json({ user_id: user.id, otp_destination: destination });
   })
 );
 
 router.post(
   '/forgot-password/confirm',
+  otpVerifyLimiter,
   asyncHandler(async (req, res) => {
     const { user_id, code, new_password } = req.body || {};
     if (!new_password || new_password.length < 8) {
@@ -421,17 +518,25 @@ router.post(
     }
     const user = await findByUserId(user_id);
     if (!user) return res.status(404).json({ error: 'مستخدم غير موجود' });
+
+    const lock = checkOtpVerifyAllowed(user);
+    if (!lock.allowed) {
+      return tooManyRequests(res, { retryAfterSeconds: lock.retryAfterSeconds, message: 'محاولات كثيرة خاطئة، حاول لاحقاً أو اطلب رمزاً جديداً' });
+    }
+
     if (!user.otp_code || user.otp_code !== code) {
+      await recordOtpFailure(user.id, user.otp_attempt_count);
       return res.status(400).json({ error: 'كود التحقق غير صحيح' });
     }
     if (new Date(user.otp_expires_at) < new Date()) {
       return res.status(400).json({ error: 'انتهت صلاحية الكود، اطلب كوداً جديداً' });
     }
     const passwordHash = await bcrypt.hash(new_password, 10);
-    await pool.query('UPDATE users SET password_hash=$1, otp_code=NULL, otp_expires_at=NULL WHERE id=$2', [
-      passwordHash,
-      user.id,
-    ]);
+    await pool.query(
+      `UPDATE users SET password_hash=$1, otp_code=NULL, otp_expires_at=NULL,
+         otp_attempt_count = 0, otp_locked_until = NULL WHERE id=$2`,
+      [passwordHash, user.id]
+    );
     res.json({ ok: true });
   })
 );

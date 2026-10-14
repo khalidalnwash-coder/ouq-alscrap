@@ -455,7 +455,7 @@ async function sendOtpChosen() {
       document.getElementById('otp-email-display').textContent = res.otp_destination;
       document.getElementById('otp-footnote-text').textContent = 'رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
     }
-    toast(`تم إرسال كود التحقق (تجريبي: ${res.dev_otp_code})`);
+    toast('تم إرسال كود التحقق');
     startOtpResendCountdown();
     go('otp');
   } catch (err) {
@@ -481,8 +481,8 @@ function startOtpResendCountdown() {
 }
 async function resendOtp() {
   try {
-    const res = await api('/auth/otp/resend', { method: 'POST', body: { user_id: pendingUserId } });
-    toast(`تم إعادة إرسال الكود (تجريبي: ${res.dev_otp_code})`);
+    await api('/auth/otp/resend', { method: 'POST', body: { user_id: pendingUserId } });
+    toast('تم إعادة إرسال الكود');
     startOtpResendCountdown();
   } catch (err) {
     toast(err.message);
@@ -603,7 +603,7 @@ async function requestForgotOtp() {
   try {
     const res = await api('/auth/forgot-password/request', { method: 'POST', body: { identifier, otp_channel: chosenFpMethod } });
     fpUserId = res.user_id;
-    toast(`تم إرسال الكود (تجريبي: ${res.dev_otp_code})`);
+    toast('تم إرسال الكود');
     document.getElementById('forgot-step1').style.display = 'none';
     document.getElementById('forgot-step2').style.display = 'block';
   } catch (err) {

@@ -3,6 +3,7 @@ const multer = require('multer');
 const { pool } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { saveImage, deleteImage, saveVideo, deleteVideo } = require('../utils/storage');
+const { detectFileType } = require('../utils/fileSignature');
 const { asyncHandler } = require('../utils/asyncHandler');
 const {
   COUNTRIES,
@@ -65,6 +66,35 @@ const uploadMedia = upload.fields([
   { name: 'images', maxCount: MAX_IMAGES },
   { name: 'video', maxCount: MAX_VIDEOS },
 ]);
+
+// Real content validation (security review item 3) — fileFilter above only
+// checks the Content-Type the uploader's own browser/client claims, which
+// is trivially spoofable (confirmed live: an HTML/JS payload labeled
+// video/mp4 was accepted and served back as-is). This re-checks each
+// buffer's actual magic bytes after multer has it in memory, before it's
+// ever handed to sharp or a storage driver. Runs after uploadMedia in every
+// route that accepts images/video.
+async function validateMediaContent(req, res, next) {
+  try {
+    const imageFiles = (req.files && req.files.images) || [];
+    for (const file of imageFiles) {
+      const detected = await detectFileType(file.buffer);
+      if (!detected || !IMAGE_MIME_TYPES.includes(detected.mime)) {
+        return res.status(400).json({ error: 'أحد الملفات ليس صورة JPG أو PNG صالحة' });
+      }
+    }
+    const videoFile = req.files && req.files.video && req.files.video[0];
+    if (videoFile) {
+      const detected = await detectFileType(videoFile.buffer);
+      if (!detected || !VIDEO_MIME_TYPES.includes(detected.mime)) {
+        return res.status(400).json({ error: 'ملف الفيديو ليس بصيغة MP4 أو MOV أو WebM صالحة' });
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
 
 function deleteMediaRow(m) {
   if (m.type === 'video') {
@@ -342,6 +372,7 @@ router.post(
   '/',
   requireAuth,
   uploadMedia,
+  validateMediaContent,
   asyncHandler(async (req, res) => {
     const {
       title,
@@ -596,6 +627,7 @@ router.patch(
   '/:id',
   requireAuth,
   uploadMedia,
+  validateMediaContent,
   asyncHandler(async (req, res) => {
     const listingRes = await pool.query('SELECT seller_id FROM listings WHERE id = $1', [req.params.id]);
     const listing = listingRes.rows[0];
