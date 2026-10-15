@@ -37,6 +37,15 @@ function tooManyRequests(res, { retryAfterSeconds, message }) {
   return res.status(429).json({ error: message, retry_after_seconds: retryAfterSeconds });
 }
 
+// sendOtp() attempted a real send (provider configured) but it genuinely
+// failed (Resend/Twilio error) → tells the client so it can show a clear
+// error instead of claiming success. "Not configured" (dev mode, logged
+// only) is deliberately NOT included here — that stays silent, matching
+// the established "never break signup locally" behavior.
+function deliveryFields(sendResult) {
+  return sendResult.attempted && !sendResult.delivered ? { delivery_failed: true } : {};
+}
+
 const PLEDGE_TEXT =
   'أتعهد بالله، واستحضاراً لقول الله تعالى "وَقُل اعمَلوا فَسَيَرَى اللَّهُ عَمَلَكُم"، أن أكون أميناً في سعيي وأدفع عمولة التطبيق (2.5%) عند إتمام أي صفقة عن طريق المنصة، وإن لم أفعل فأتصدق بمثل هذا المبلغ';
 
@@ -120,15 +129,19 @@ router.post(
     const user = result.rows[0];
 
     const destination = otp_channel === 'whatsapp' ? `${phone_country_code}${phone_number}` : normalizedEmail;
-    await sendOtp({ channel: otp_channel, destination, code });
+    const sendResult = await sendOtp({ channel: otp_channel, destination, code });
 
     // The code itself is never returned here (security review item 1) — it's
     // delivered via the real provider when configured (see server/.env.example),
-    // and always logged server-side only, never to the HTTP caller.
+    // and always logged server-side only, never to the HTTP caller. The
+    // account still exists either way, so a failed send surfaces as
+    // delivery_failed rather than a hard error — the user lands on the OTP
+    // screen with a working "إعادة الإرسال" button instead of a dead end.
     res.status(201).json({
       user_id: user.id,
       otp_channel,
       otp_destination: destination,
+      ...deliveryFields(sendResult),
     });
   })
 );
@@ -181,9 +194,9 @@ router.post(
       user.id,
     ]);
     const destination = user.otp_channel === 'whatsapp' ? `${user.phone_country_code}${user.phone_number}` : user.email;
-    await sendOtp({ channel: user.otp_channel, destination, code });
+    const sendResult = await sendOtp({ channel: user.otp_channel, destination, code });
 
-    res.json({ ok: true, otp_destination: destination });
+    res.json({ ok: true, otp_destination: destination, ...deliveryFields(sendResult) });
   })
 );
 
@@ -351,9 +364,9 @@ router.post(
           ? `${phone_country_code}${phone_number}`
           : `${user.phone_country_code}${user.phone_number}`
         : normalizedEmail || user.email;
-    await sendOtp({ channel: otp_channel, destination, code });
+    const sendResult = await sendOtp({ channel: otp_channel, destination, code });
 
-    res.json({ otp_destination: destination });
+    res.json({ otp_destination: destination, ...deliveryFields(sendResult) });
   })
 );
 
@@ -502,9 +515,9 @@ router.post(
       user.id,
     ]);
     const destination = otp_channel === 'whatsapp' ? `${user.phone_country_code}${user.phone_number}` : user.email;
-    await sendOtp({ channel: otp_channel, destination, code });
+    const sendResult = await sendOtp({ channel: otp_channel, destination, code });
 
-    res.json({ user_id: user.id, otp_destination: destination });
+    res.json({ user_id: user.id, otp_destination: destination, ...deliveryFields(sendResult) });
   })
 );
 

@@ -69,7 +69,23 @@ app.use(helmet({ contentSecurityPolicy: false }));
 // webview, etc. A request with no Origin header at all (curl,
 // server-to-server) is never affected by CORS in the first place; this
 // only governs cross-origin browser requests.
-const configuredOrigins = (envTrim('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+//
+// DEFAULT_ALLOWED_ORIGINS is a baked-in safety net for this project's own
+// known domains (the custom domain, its www variant, and the original
+// Render URL, kept working even after the custom domain is primary) — on
+// top of, not instead of, the dynamic self-origin check above. Covers the
+// case where the custom domain and the onrender.com URL are both live at
+// once, and is immune to any future self-origin/proxy edge case the way a
+// purely dynamic check wouldn't be.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://tashleehalkhaleej.com',
+  'https://www.tashleehalkhaleej.com',
+  'https://ouq-alscrap.onrender.com',
+];
+const configuredOrigins = [
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...(envTrim('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean),
+];
 const isProduction = envTrim('NODE_ENV') === 'production';
 app.use(
   cors((req, callback) => {
