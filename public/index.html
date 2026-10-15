@@ -114,22 +114,22 @@
       <p style="font-size:var(--fs-md); font-weight:700; text-align:center; margin-bottom:4px;">كيف تبي تستلم كود التحقق؟</p>
       <p class="muted center" style="margin-bottom:20px;">اختر الطريقة الأسرع لك</p>
 
-      <div id="method-whatsapp" onclick="selectOtpMethod('whatsapp')"
+      <div id="method-email" onclick="selectOtpMethod('email')"
         style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius); padding:15px; margin-bottom:10px; border:2px solid var(--blue); cursor:pointer;">
-        <i data-lucide="message-circle" class="icon icon-lg" style="color:var(--blue);"></i>
+        <i data-lucide="mail" class="icon icon-lg" style="color:var(--blue);"></i>
         <div style="flex:1;">
-          <p style="font-size:var(--fs-base); font-weight:600;">عبر واتساب</p>
-          <p class="muted" style="font-size:var(--fs-xs);">أسرع وأكثر شيوعاً</p>
+          <p style="font-size:var(--fs-base); font-weight:600;">عبر البريد الإلكتروني</p>
+          <p class="muted" style="font-size:var(--fs-xs);">يوصلك الكود خلال ثوانٍ</p>
         </div>
         <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--blue); background:var(--blue);"></div>
       </div>
 
-      <div id="method-email" onclick="selectOtpMethod('email')"
+      <div id="method-whatsapp" onclick="selectOtpMethod('whatsapp')"
         style="display:flex; align-items:center; gap:12px; background:var(--bg); border-radius:var(--radius); padding:15px; margin-bottom:20px; border:2px solid var(--border); cursor:pointer;">
-        <i data-lucide="mail" class="icon icon-lg icon-muted"></i>
+        <i data-lucide="message-circle" class="icon icon-lg icon-muted"></i>
         <div style="flex:1;">
-          <p style="font-size:var(--fs-base); font-weight:600;">عبر البريد الإلكتروني</p>
-          <p class="muted" style="font-size:var(--fs-xs);">إذا ما كان واتسابك مفعّل بهذا الرقم</p>
+          <p style="font-size:var(--fs-base); font-weight:600;">عبر واتساب</p>
+          <p class="muted" style="font-size:var(--fs-xs);">قريباً</p>
         </div>
         <div class="otp-radio" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border);"></div>
       </div>
@@ -370,8 +370,8 @@
       <p class="muted" style="margin-bottom:14px;">أدخل بريدك أو جوالك المسجل، وبنرسل لك كود تحقق</p>
       <input id="fp-identifier" placeholder="example@email.com">
       <div class="toggle-group">
-        <div class="toggle-opt selected" id="fp-method-whatsapp" onclick="selectFpMethod('whatsapp')">واتساب</div>
-        <div class="toggle-opt" id="fp-method-email" onclick="selectFpMethod('email')">بريد إلكتروني</div>
+        <div class="toggle-opt selected" id="fp-method-email" onclick="selectFpMethod('email')">بريد إلكتروني</div>
+        <div class="toggle-opt" id="fp-method-whatsapp" onclick="selectFpMethod('whatsapp')">واتساب (قريباً)</div>
       </div>
       <p class="error-text" id="fp-error1" style="display:none;"></p>
       <button class="btn-primary" onclick="requestForgotOtp()">إرسال الكود</button>
@@ -786,8 +786,8 @@
         <span>تغيير رقم الجوال أو البريد الإلكتروني يحتاج تأكيد برمز يُرسل لك، مثل التسجيل.</span>
       </p>
       <div class="toggle-group" id="ep-otp-channel">
-        <div class="toggle-opt selected" id="ep-channel-whatsapp" onclick="selectEpOtpChannel('whatsapp')">تأكيد عبر واتساب</div>
-        <div class="toggle-opt" id="ep-channel-email" onclick="selectEpOtpChannel('email')">تأكيد عبر بريد إلكتروني</div>
+        <div class="toggle-opt selected" id="ep-channel-email" onclick="selectEpOtpChannel('email')">تأكيد عبر بريد إلكتروني</div>
+        <div class="toggle-opt" id="ep-channel-whatsapp" onclick="selectEpOtpChannel('whatsapp')">تأكيد عبر واتساب (قريباً)</div>
       </div>
 
       <p class="error-text" id="ep-error1" style="display:none;"></p>

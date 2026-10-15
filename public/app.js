@@ -2,8 +2,12 @@
 let history_ = ['landing'];
 let signupData = null; // collected on signup form submit, sent to API once OTP channel is chosen
 let pendingUserId = null; // user id awaiting OTP verification
-let chosenOtpMethod = 'whatsapp';
-let chosenFpMethod = 'whatsapp';
+// Email is the default channel everywhere — WhatsApp delivery isn't wired
+// to a real provider yet (see sendOtpChosen/requestForgotOtp/
+// submitEditProfile, which all block it with a "coming soon" message
+// instead of sending a request that would silently lose the code).
+let chosenOtpMethod = 'email';
+let chosenFpMethod = 'email';
 let fpUserId = null;
 let currentUser = null;
 let meta = { countries: [], cities_by_country: {}, part_categories: [], vehicle_categories: {}, report_reasons: { listing: [], account: [] }, support_issue_types: [], commission_rate: 0.025, bank_account: null, contact: null };
@@ -464,7 +468,14 @@ function selectOtpMethod(method) {
   document.querySelector('#method-email .otp-radio').style.background = method === 'email' ? 'var(--blue)' : 'transparent';
   document.querySelector('#method-email .otp-radio').style.borderColor = method === 'email' ? 'var(--blue)' : '#C9CDD3';
 }
+// WhatsApp delivery isn't wired to a real provider in production yet —
+// intercepted here (before any request) rather than left to fail server-side,
+// so a user never ends up stuck on the OTP screen waiting for a code that
+// was never actually sent anywhere.
+const WHATSAPP_NOT_READY_MESSAGE = 'الإرسال بالواتساب قريباً، استخدم الإيميل';
+
 async function sendOtpChosen() {
+  if (chosenOtpMethod === 'whatsapp') return toast(WHATSAPP_NOT_READY_MESSAGE);
   try {
     const res = await api('/auth/signup', { method: 'POST', body: { ...signupData, otp_channel: chosenOtpMethod } });
     pendingUserId = res.user_id;
@@ -480,7 +491,7 @@ async function sendOtpChosen() {
       document.getElementById('otp-email-display').textContent = res.otp_destination;
       document.getElementById('otp-footnote-text').textContent = 'رقم جوالك محفوظ لتسهيل التواصل، بدون الحاجة لتأكيده الآن';
     }
-    toast('تم إرسال كود التحقق');
+    toast(res.delivery_failed ? 'تعذّر إرسال كود التحقق، اضغط "إعادة الإرسال" للمحاولة مرة أخرى' : 'تم إرسال كود التحقق');
     startOtpResendCountdown();
     go('otp');
   } catch (err) {
@@ -506,8 +517,8 @@ function startOtpResendCountdown() {
 }
 async function resendOtp() {
   try {
-    await api('/auth/otp/resend', { method: 'POST', body: { user_id: pendingUserId } });
-    toast('تم إعادة إرسال الكود');
+    const res = await api('/auth/otp/resend', { method: 'POST', body: { user_id: pendingUserId } });
+    toast(res.delivery_failed ? 'تعذّر إرسال كود التحقق، حاول مرة أخرى بعد قليل' : 'تم إعادة إرسال الكود');
     startOtpResendCountdown();
   } catch (err) {
     toast(err.message);
@@ -623,12 +634,13 @@ function selectFpMethod(method) {
 }
 async function requestForgotOtp() {
   hideError('fp-error1');
+  if (chosenFpMethod === 'whatsapp') return showError('fp-error1', WHATSAPP_NOT_READY_MESSAGE);
   const identifier = document.getElementById('fp-identifier').value.trim();
   if (!identifier) return showError('fp-error1', 'أدخل البريد أو رقم الجوال');
   try {
     const res = await api('/auth/forgot-password/request', { method: 'POST', body: { identifier, otp_channel: chosenFpMethod } });
     fpUserId = res.user_id;
-    toast('تم إرسال الكود');
+    toast(res.delivery_failed ? 'تعذّر إرسال كود التحقق، اضغط "إعادة الإرسال" للمحاولة مرة أخرى' : 'تم إرسال الكود');
     document.getElementById('forgot-step1').style.display = 'none';
     document.getElementById('forgot-step2').style.display = 'block';
   } catch (err) {
@@ -2132,7 +2144,7 @@ async function togglePhoneVisibility() {
 
 // ---------- edit account profile (name/phone/city/email, OTP-gated for phone+email) ----------
 let epOriginal = null;
-let epOtpChannel = 'whatsapp';
+let epOtpChannel = 'email';
 let epPendingHasPhone = false;
 let epPendingHasEmail = false;
 function renderEditProfile() {
@@ -2142,7 +2154,7 @@ function renderEditProfile() {
   document.getElementById('ep-phone').value = currentUser.phone_number;
   document.getElementById('ep-email').value = currentUser.email;
   populateEpCities(currentUser.city || '');
-  selectEpOtpChannel('whatsapp');
+  selectEpOtpChannel('email');
   hideError('ep-error1');
   hideError('ep-error2');
   document.getElementById('ep-step1').style.display = 'block';
@@ -2187,6 +2199,9 @@ async function submitEditProfile() {
     toast('لا يوجد تعديل');
     return go('profile');
   }
+  if ((phoneChanged || emailChanged) && epOtpChannel === 'whatsapp') {
+    return showError('ep-error1', WHATSAPP_NOT_READY_MESSAGE);
+  }
 
   const btn = document.getElementById('ep-submit');
   btn.disabled = true;
@@ -2210,7 +2225,8 @@ async function submitEditProfile() {
       document.getElementById('ep-step2').style.display = 'block';
       document.querySelectorAll('#ep-step2 .otp-row input').forEach((inp) => (inp.value = ''));
       document.querySelector('#ep-step2 .otp-row input').focus();
-      if (nameChanged || cityChanged) toast('تم حفظ الاسم/المدينة، أكمل تأكيد الجوال/البريد');
+      if (res.delivery_failed) toast('تعذّر إرسال كود التحقق، اضغط "إعادة الإرسال" للمحاولة مرة أخرى');
+      else if (nameChanged || cityChanged) toast('تم حفظ الاسم/المدينة، أكمل تأكيد الجوال/البريد');
     } else {
       toast('تم حفظ التغييرات');
       go('profile');
